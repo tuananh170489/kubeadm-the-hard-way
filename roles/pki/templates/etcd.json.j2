@@ -1,0 +1,20 @@
+{
+    "CN": "etcd",
+    "hosts": [
+        "*.{{ root_dns }}",
+        "localhost",
+        "127.0.0.1"
+    ],
+    "key": {
+        "algo": "rsa",
+        "size": 2048
+    },
+    "names": [
+        {
+            "C": "{{ country }}",
+            "L": "{{ location }}",
+            "O": "{{ organization }}",
+            "OU": "{{ organization_unit }}"
+        }
+    ]
+}

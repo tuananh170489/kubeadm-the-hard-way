@@ -1,0 +1,30 @@
+kind: KubeletConfiguration
+apiVersion: kubelet.config.k8s.io/v1beta1
+authentication:
+  anonymous:
+    enabled: false
+  webhook:
+    enabled: true
+  x509:
+    clientCAFile: "{{ k8s_certs_path }}/ca.pem"
+authorization:
+  mode: Webhook
+    cacheAuthorizedTTL: 5m0s
+    cacheUnauthorizedTTL: 30s
+cgroupDriver: cgroupfs
+evictionPressureTransitionPeriod: 5s
+failSwapOn: false
+fileCheckFrequency: 20s
+nodeStatusUpdateFrequency: 10s
+nodeStatusReportFrequency: 10s
+nodeLeaseDurationSeconds: 30
+maxOpenFiles: 1048576
+clusterDomain: "cluster.local"
+clusterDNS:
+  - "{{ cluster_dns }}"
+resolvConf: "/etc/resolv.conf"
+runtimeRequestTimeout: "15m"
+rotateCertificates: true
+syncFrequency: 30s
+tlsCertFile: "{{ k8s_certs_path }}/kubelet.pem"
+tlsPrivateKeyFile: "{{ k8s_certs_path }}/kubelet-key.pem"

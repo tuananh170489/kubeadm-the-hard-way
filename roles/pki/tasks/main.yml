@@ -1,0 +1,44 @@
+- name: Create PKI directory
+  file:
+    path: '{{ item }}'
+    state: directory
+  loop:
+    - '{{ pki_path }}'
+    - '{{ pki_etcd_path }}'
+    - '{{ pki_k8s_path }}'
+    - '{{ pki_front_proxy }}'
+
+- name: Generate CA certificate
+  shell:
+    cmd: |
+      cat << EOF | cfssl gencert -initca - | cfssljson -bare {{ pki_path }}/ca
+      {{ lookup('template', 'ca-csr.json.j2') | to_nice_json(indent=4) }}
+      EOF
+  args:
+    executable: /bin/bash
+
+- name: Generate etcd certificate
+  include: etcd_pki.yaml
+
+- name: Generate kubernetes certificate
+  include: k8s_pki.yaml
+
+- name: Generate front proxy CA private key
+  copy:
+    src: '{{ item.src }}'
+    dest: '{{ item.dest }}'
+    remote_src: Yes
+  loop:
+    - { src: '{{ pki_path }}/ca.pem', dest: '{{ pki_path }}/front-proxy-ca.pem' }
+    - { src: '{{ pki_path }}/ca-key.pem', dest: '{{ pki_path }}/front-proxy-ca-key.pem' }
+
+- name: Generate front proxy certificate
+  include: front-proxy.yaml
+
+- name: Make pki files accessable
+  file:
+    path: '{{ pki_path }}'
+    state: directory
+    recurse: Yes
+    mode: 0644
+    owner: "{{ lookup('env', 'USER') }}"

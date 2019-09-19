@@ -1,0 +1,8 @@
+127.0.0.1	{{ inventory_hostname }} localhost
+{% for host in groups['all'] %}
+{% if host in groups['loadbalancer'] %}
+{{ hostvars[host]['ansible_default_ipv4']['address'] }}	{{ host }} {{ etcd_url }} {{ apis_url }}
+{% else %}
+{{ hostvars[host]['ansible_default_ipv4']['address'] }}	{{ host }} {{ host }}.{{ root_dns }}
+{% endif %}
+{% endfor -%}

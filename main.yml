@@ -1,0 +1,67 @@
+- name: Deploy common settings
+  hosts: all
+  gather_facts: yes
+  become: true
+  become_user: root
+  roles:
+    - common
+    - ssh
+
+- name: Create the PKI
+  hosts: localhost
+  connection: local
+  roles:
+    - pki
+  tags: pki
+
+- name: Generate the kubeconfig files
+  hosts: localhost
+  connection: local
+  roles:
+    - kubeconfig
+  tags: kubeconfig
+
+- name: Deploy loadbalancer
+  hosts: loadbalancer
+  gather_facts: yes
+  become: true
+  become_user: root
+  roles:
+    - loadbalancer
+  tags: deploy_loadbalancer
+
+- name: Deploy etcd
+  hosts: master
+  gather_facts: yes
+  become: true
+  become_user: root
+  roles:
+    - etcd
+  tags: deploy_etcd
+
+- name: Deploy kubernetes master nodes
+  hosts: master
+  gather_facts: yes
+  become: true
+  become_user: root
+  roles:
+    - kubernetes
+  tags: deploy_master
+
+- name: Deploy kubernetes worker nodes
+  hosts: worker
+  gather_facts: yes
+  become: true
+  become_user: root
+  roles:
+    - kubernetes
+  tags: deploy_worker
+
+- name: Deploy addons
+  hosts: master
+  gather_facts: yes
+  become: true
+  become_user: root
+  roles:
+    - kubernetes
+  tags: deploy_addons

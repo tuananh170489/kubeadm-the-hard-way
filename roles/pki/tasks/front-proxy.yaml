@@ -1,0 +1,11 @@
+- name: Generate front-proxy-client certificate
+  shell:
+    cmd: |
+      cat << EOF | cfssl gencert \
+        -ca={{ pki_path }}/ca.pem \
+        -ca-key={{ pki_path }}/ca-key.pem \
+        -profile=kubernetes - | cfssljson -bare {{ pki_front_proxy }}/front-proxy-client
+      {{ lookup('template', 'front-proxy-client.json.j2') | to_nice_json(indent=4) }}
+      EOF
+  args:
+    executable: /bin/bash

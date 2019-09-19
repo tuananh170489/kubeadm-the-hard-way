@@ -1,0 +1,108 @@
+- name: Generate apiserver certificate
+  shell:
+    cmd: |
+      cat << EOF | cfssl gencert \
+        -ca={{ pki_path }}/ca.pem \
+        -ca-key={{ pki_path }}/ca-key.pem \
+        -profile=kubernetes - | cfssljson -bare {{ pki_k8s_path }}/apiserver
+      {{ lookup('template', 'apiserver.json.j2') | to_nice_json(indent=4) }}
+      EOF
+  args:
+    executable: /bin/bash
+
+- name: Generate apiserver-etcd-client certificate
+  shell:
+    cmd: |
+      cat << EOF | cfssl gencert \
+        -ca={{ pki_path }}/ca.pem \
+        -ca-key={{ pki_path }}/ca-key.pem \
+        -profile=kubernetes - | cfssljson -bare {{ pki_k8s_path }}/apiserver-etcd-client
+      {{ lookup('template', 'apiserver-etcd-client.json.j2') | to_nice_json(indent=4) }}
+      EOF
+  args:
+    executable: /bin/bash
+
+- name: Generate apiserver-kubelet-client certificate
+  shell:
+    cmd: |
+      cat << EOF | cfssl gencert \
+        -ca={{ pki_path }}/ca.pem \
+        -ca-key={{ pki_path }}/ca-key.pem \
+        -profile=kubernetes - | cfssljson -bare {{ pki_k8s_path }}/apiserver-kubelet-client
+      {{ lookup('template', 'apiserver-kubelet-client.json.j2') | to_nice_json(indent=4) }}
+      EOF
+  args:
+    executable: /bin/bash
+
+- name: Generate admin certificate
+  shell:
+    cmd: |
+      cat << EOF | cfssl gencert \
+        -ca={{ pki_path }}/ca.pem \
+        -ca-key={{ pki_path }}/ca-key.pem \
+        -profile=kubernetes - | cfssljson -bare {{ pki_k8s_path }}/admin
+      {{ lookup('template', 'admin.json.j2') | to_nice_json(indent=4) }}
+      EOF
+  args:
+    executable: /bin/bash
+
+- name: Generate controller-manager certificate
+  shell:
+    cmd: |
+      cat << EOF | cfssl gencert \
+        -ca={{ pki_path }}/ca.pem \
+        -ca-key={{ pki_path }}/ca-key.pem \
+        -profile=kubernetes - | cfssljson -bare {{ pki_k8s_path }}/controller-manager
+      {{ lookup('template', 'controller-manager.json.j2') | to_nice_json(indent=4) }}
+      EOF
+  args:
+    executable: /bin/bash
+
+- name: Generate scheduler certificate
+  shell:
+    cmd: |
+      cat << EOF | cfssl gencert \
+        -ca={{ pki_path }}/ca.pem \
+        -ca-key={{ pki_path }}/ca-key.pem \
+        -profile=kubernetes - | cfssljson -bare {{ pki_k8s_path }}/scheduler
+      {{ lookup('template', 'scheduler.json.j2') | to_nice_json(indent=4) }}
+      EOF
+  args:
+    executable: /bin/bash
+
+- name: Generate services-accounts certificate
+  shell:
+    cmd: |
+      cat << EOF | cfssl gencert \
+        -ca={{ pki_path }}/ca.pem \
+        -ca-key={{ pki_path }}/ca-key.pem \
+        -profile=kubernetes - | cfssljson -bare {{ pki_k8s_path }}/services-accounts
+      {{ lookup('template', 'services-accounts.json.j2') | to_nice_json(indent=4) }}
+      EOF
+  args:
+    executable: /bin/bash
+
+- name: Generate kubelet certificate
+  shell:
+    cmd: |
+      cat << EOF | cfssl gencert \
+        -ca={{ pki_path }}/ca.pem \
+        -ca-key={{ pki_path }}/ca-key.pem \
+        -profile=kubernetes - | cfssljson -bare {{ pki_k8s_path }}/{{ item }}
+      {{ lookup('template', 'kubelet.json.j2') | to_nice_json(indent=4) }}
+      EOF
+  args:
+    executable: /bin/bash
+  loop: "{{ groups['worker'] }}"
+
+- name: Generate proxy certificate
+  shell:
+    cmd: |
+      cat << EOF | cfssl gencert \
+        -ca={{ pki_path }}/ca.pem \
+        -ca-key={{ pki_path }}/ca-key.pem \
+        -profile=kubernetes - | cfssljson -bare {{ pki_k8s_path }}/proxy
+      {{ lookup('template', 'proxy.json.j2') | to_nice_json(indent=4) }}
+      EOF
+  args:
+    executable: /bin/bash

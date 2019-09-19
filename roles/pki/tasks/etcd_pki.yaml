@@ -1,0 +1,35 @@
+- name: Generate etcd certificate
+  shell:
+    cmd: |
+      cat << EOF | cfssl gencert \
+        -ca={{ pki_path }}/ca.pem \
+        -ca-key={{ pki_path }}/ca-key.pem \
+        -profile=kubernetes - | cfssljson -bare {{ pki_etcd_path }}/etcd
+      {{ lookup('template', 'etcd.json.j2') | to_nice_json(indent=4) }}
+      EOF
+  args:
+    executable: /bin/bash
+
+- name: Generate etcd-peer certificate
+  shell:
+    cmd: |
+      cat << EOF | cfssl gencert \
+        -ca={{ pki_path }}/ca.pem \
+        -ca-key={{ pki_path }}/ca-key.pem \
+        -profile=kubernetes - | cfssljson -bare {{ pki_etcd_path }}/etcd-peer
+      {{ lookup('template', 'etcd-peer.json.j2') | to_nice_json(indent=4) }}
+      EOF
+  args:
+    executable: /bin/bash
+
+- name: Generate etcd-healthcheck-client certificate
+  shell:
+    cmd: |
+      cat << EOF | cfssl gencert \
+        -ca={{ pki_path }}/ca.pem \
+        -ca-key={{ pki_path }}/ca-key.pem \
+        -profile=kubernetes - | cfssljson -bare {{ pki_etcd_path }}/etcd-healthcheck-client
+      {{ lookup('template', 'etcd-healthcheck-client.json.j2') | to_nice_json(indent=4) }}
+      EOF
+  args:
+    executable: /bin/bash

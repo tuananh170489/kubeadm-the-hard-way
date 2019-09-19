@@ -1,0 +1,12 @@
+# all vars
+pki_path: '{{ playbook_dir }}/certs'
+pki_etcd_path: '{{ playbook_dir }}/certs/etcd'
+pki_k8s_path: '{{ playbook_dir }}/certs/kubernetes'
+pki_front_proxy: '{{ playbook_dir }}/certs/front_proxy'
+
+kubeconfig_dir: '{{ playbook_dir }}/kubeconfig'
+
+cluster_name: k8s
+root_dns: k8s.local
+apis_url: apis.{{ root_dns }}
+etcd_url: etcd.{{ root_dns }}

@@ -1,0 +1,23 @@
+---
+server_name: k8s
+vpn_network: 10.9.0.0
+vpn_netmask: 255.255.255.0
+local_network: 192.168.0.0
+local_netmask: 255.255.255.0
+
+easy_rsa_dir: /etc/openvpn/easy-rsa
+crl_expire_day: 3650
+
+key_country: VN
+key_province: HN
+key_city: HaNoi
+key_org: FPT
+key_email: anhpt81@fpt.com.vn
+key_ou: DevOps
+key_name: Kubernetes
+key_cn: k8s
+key_size: 2048
+cnf_file: "{{ easy_rsa_dir }}/openssl-1.0.0.cnf"
+
+clients:
+  { name: k8s, email: k8s@fpt.com.vn }

@@ -1,0 +1,24 @@
+---
+- name: Create kubernetes neccessary directories
+  file:
+    path: '{{ item }}'
+    state: directory
+    recurse: yes
+  loop:
+    # - '{{ k8s_certs_path }}'
+    # - '{{ kubeconfig_path }}'
+    - /var/lib/kubernetes
+
+- name: Bootstrapping the Kubernetes Control Plane
+  include: bootstrap_controller.yml
+
+# - name: Create RBAC
+#   include: rbac.yml
+#   delegate_to: localhost
+#   run_once: True
+
+# - name: Bootstrapping the Kubernetes Worker Nodes
+#   include: bootstrap_worker.yml
+
+# - name: Deploy addons
+#   include: addons.yml

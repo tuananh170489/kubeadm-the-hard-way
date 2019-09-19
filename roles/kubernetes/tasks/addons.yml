@@ -1,0 +1,13 @@
+- name: Download kube-router
+  get_url:
+    url: https://github.com/cloudnativelabs/kube-router/releases/download/v{{ kube-router_version }}/kube-router_{{ kube-router_version }}_linux_amd64.tar.gz
+    dest: /tmp/
+
+- name: Install kube-router
+  unarchive:
+    remote_src: yes
+    src: /tmp/kube-router_{{ kube-router_version }}_linux_amd64.tar.gz
+    dest: /usr/local/bin/
+    mode: 0755
+    extra_opts:
+      - kube-router

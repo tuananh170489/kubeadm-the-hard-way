@@ -1,0 +1,68 @@
+---
+- name: Create OpenVPN group
+  group:
+    name: openvpn
+    state: present
+    system: yes
+
+- name: Create OpenVPN user
+  user:
+    name: openvpn
+    comment: ''
+    shell: /bin/false
+    group: openvpn
+    system: yes
+    state: present
+    create_home: no
+    home: /etc/openvpn
+
+- name: Generate easy-rsa directory
+  command: cp -r /usr/share/easy-rsa /etc/openvpn/
+
+- name: Create neccessary directory
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: 0755
+  with_items:
+    - /etc/openvpn/easy-rsa/keys
+    - /etc/openvpn/easy-rsa/client-keys
+    - /var/log/openvpn
+
+- name: Update neccessary file
+  template:
+    src: "{{ item.src }}"
+    dest: "{{ item.dest }}"
+    owner: root
+    group: root
+  with_items:
+    - { src: build-openvpn.j2, dest: /etc/openvpn/easy-rsa/build-openvpn }
+    - { src: openssl-1.0.0.cnf.j2, dest: /etc/openvpn/easy-rsa/openssl-1.0.0.cnf }
+    - { src: vars.j2, dest: /etc/openvpn/easy-rsa/vars }
+    - { src: server.conf.j2, dest: /etc/openvpn/server.conf }
+
+- name: Building OpenVPN key
+  command: /bin/bash {{ easy_rsa_dir }}/build-openvpn
+
+- name: Copy neccessary key to OpenVPN directory
+  copy:
+    remote_src: yes
+    src: "{{ item.src }}"
+    dest: "{{ item.dest }}"
+  with_items:
+    - { src: "/etc/openvpn/easy-rsa/keys/{{ server_name }}.crt", dest: /etc/openvpn }
+    - { src: "/etc/openvpn/easy-rsa/keys/{{ server_name }}.key", dest: /etc/openvpn }
+    - { src: /etc/openvpn/easy-rsa/keys/ca.crt, dest: /etc/openvpn }
+    - { src: /etc/openvpn/ta.key, dest: /etc/openvpn/easy-rsa/keys }
+    - { src: /etc/openvpn/easy-rsa/keys/crl.pem, dest: /etc/openvpn }
+    - { src: "/etc/openvpn/easy-rsa/keys/dh{{ key_size }}.pem", dest: /etc/openvpn }
+
+- name: Be sure OpenVPN is running and enabled
+  service:
+    name: openvpn@server
+    state: started
+    enabled: yes
+  notify:
+    - restart openvpn

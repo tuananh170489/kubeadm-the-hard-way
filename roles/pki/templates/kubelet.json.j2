@@ -1,0 +1,18 @@
+{
+    "CN": "system:node:{{ item }}",
+    "hosts": [
+        "*.{{ root_dns }}"
+    ],
+    "key": {
+        "algo": "rsa",
+        "size": 2048
+    },
+    "names": [
+        {
+            "C": "{{ country }}",
+            "L": "{{ location }}",
+            "O": "system:nodes",
+            "OU": "{{ organization_unit }}"
+        }
+    ]
+}

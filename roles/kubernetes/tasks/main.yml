@@ -5,8 +5,8 @@
     state: directory
     recurse: yes
   loop:
-    # - '{{ k8s_certs_path }}'
-    # - '{{ kubeconfig_path }}'
+    - '{{ k8s_certs_path }}'
+    - '{{ kubeconfig_path }}'
     - /var/lib/kubernetes
 
 - name: Bootstrapping the Kubernetes Control Plane

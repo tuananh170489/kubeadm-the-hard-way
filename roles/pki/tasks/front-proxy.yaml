@@ -1,11 +1,34 @@
+- name: Generate front-proxy-client private key
+  openssl_privatekey:
+    path: '{{ pki_front_proxy }}/front-proxy-client-key.pem'
+    mode: 0644
+    owner: "{{ lookup('env', 'USER') }}"
+
+- name: Generate front-proxy-client CSR
+  openssl_csr:
+    path: '{{ pki_front_proxy }}/front-proxy-client.csr'
+    privatekey_path: '{{ pki_front_proxy }}/front-proxy-client-key.pem'
+    basic_constraints: "CA:FALSE"
+    basic_constraints_critical: True
+    key_usage:
+      - digitalSignature
+      - keyEncipherment
+    key_usage_critical: True
+    extended_key_usage:
+      - clientAuth
+    common_name: 'front-proxy-client'
+    country_name: '{{ country }}'
+    locality_name: '{{ location }}'
+    organization_name: '{{ organization }}'
+    organizational_unit_name: '{{ organization_unit }}'
+
 - name: Generate front-proxy-client certificate
-  shell:
-    cmd: |
-      cat << EOF | cfssl gencert \
-        -ca={{ pki_path }}/ca.pem \
-        -ca-key={{ pki_path }}/ca-key.pem \
-        -profile=kubernetes - | cfssljson -bare {{ pki_front_proxy }}/front-proxy-client
-      {{ lookup('template', 'front-proxy-client.json.j2') | to_nice_json(indent=4) }}
-      EOF
-  args:
-    executable: /bin/bash
+  openssl_certificate:
+    path: '{{ pki_front_proxy }}/front-proxy-client.pem'
+    csr_path: '{{ pki_front_proxy }}/front-proxy-client.csr'
+    ownca_path: '{{ pki_path }}/front-proxy-ca.pem'
+    ownca_privatekey_path: '{{ pki_path }}/front-proxy-ca-key.pem'
+    provider: ownca
+    ownca_not_after: +{{ expire_days }}
+    mode: 0644
+    owner: "{{ lookup('env', 'USER') }}"

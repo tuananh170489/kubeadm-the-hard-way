@@ -25,7 +25,7 @@
     path: '{{ item }}'
     state: directory
   loop:
-    # - '{{ config_dir }}'
+    - '{{ config_dir }}'
     - '{{ data_dir }}'
 
 - name: Copy etcd certificates

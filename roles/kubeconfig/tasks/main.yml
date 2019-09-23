@@ -29,22 +29,22 @@
       --certificate-authority={{ pki_path }}/ca.pem \
       --embed-certs=true \
       --server=https://{{ apis_url }}:6443 \
-      --kubeconfig={{ kubeconfig_dir }}/controller-manager.kubeconfig
+      --kubeconfig={{ kubeconfig_dir }}/kube-controller-manager.conf
 
     kubectl config set-credentials system:kube-controller-manager \
-      --client-certificate={{ pki_k8s_path }}/controller-manager.pem \
-      --client-key={{ pki_k8s_path }}/controller-manager-key.pem \
+      --client-certificate={{ pki_k8s_path }}/kube-controller-manager.pem \
+      --client-key={{ pki_k8s_path }}/kube-controller-manager-key.pem \
       --embed-certs=true \
-      --kubeconfig={{ kubeconfig_dir }}/controller-manager.kubeconfig
+      --kubeconfig={{ kubeconfig_dir }}/kube-controller-manager.conf
 
     kubectl config set-context controller-manager \
       --cluster={{ cluster_name }} \
       --user=system:kube-controller-manager \
-      --kubeconfig={{ kubeconfig_dir }}/controller-manager.kubeconfig
+      --kubeconfig={{ kubeconfig_dir }}/kube-controller-manager.conf
 
-    kubectl config use-context controller-manager --kubeconfig={{ kubeconfig_dir }}/controller-manager.kubeconfig
+    kubectl config use-context controller-manager --kubeconfig={{ kubeconfig_dir }}/kube-controller-manager.conf
   args:
-    creates: '{{ kubeconfig_dir }}/controller-manager.kubeconfig'
+    creates: '{{ kubeconfig_dir }}/kube-controller-manager.conf'
 
 - name: Generate kubeconfig file for kube-scheduler service
   shell: |
@@ -52,22 +52,22 @@
       --certificate-authority={{ pki_path }}/ca.pem \
       --embed-certs=true \
       --server=https://{{ apis_url }}:6443 \
-      --kubeconfig={{ kubeconfig_dir }}/scheduler.kubeconfig
+      --kubeconfig={{ kubeconfig_dir }}/kube-scheduler.conf
 
     kubectl config set-credentials system:kube-scheduler \
-      --client-certificate={{ pki_k8s_path }}/scheduler.pem \
-      --client-key={{ pki_k8s_path }}/scheduler-key.pem \
+      --client-certificate={{ pki_k8s_path }}/kube-scheduler.pem \
+      --client-key={{ pki_k8s_path }}/kube-scheduler-key.pem \
       --embed-certs=true \
-      --kubeconfig={{ kubeconfig_dir }}/scheduler.kubeconfig
+      --kubeconfig={{ kubeconfig_dir }}/kube-scheduler.conf
 
     kubectl config set-context scheduler \
       --cluster={{ cluster_name }} \
       --user=system:kube-scheduler \
-      --kubeconfig={{ kubeconfig_dir }}/scheduler.kubeconfig
+      --kubeconfig={{ kubeconfig_dir }}/kube-scheduler.conf
 
-    kubectl config use-context scheduler --kubeconfig={{ kubeconfig_dir }}/scheduler.kubeconfig
+    kubectl config use-context scheduler --kubeconfig={{ kubeconfig_dir }}/kube-scheduler.conf
   args:
-    creates: '{{ kubeconfig_dir }}/scheduler.kubeconfig'
+    creates: '{{ kubeconfig_dir }}/kube-scheduler.conf'
 
 - name: Generate kubeconfig file for kubelet service
   shell: |
@@ -75,48 +75,25 @@
       --certificate-authority={{ pki_path }}/ca.pem \
       --embed-certs=true \
       --server=https://{{ apis_url }}:6443 \
-      --kubeconfig={{ kubeconfig_dir }}/{{ item }}.kubeconfig
+      --kubeconfig={{ kubeconfig_dir }}/{{ item }}.conf
 
     kubectl config set-credentials system:node:{{ item }} \
       --client-certificate={{ pki_k8s_path }}/{{ item }}.pem \
       --client-key={{ pki_k8s_path }}/{{ item }}-key.pem \
       --embed-certs=true \
-      --kubeconfig={{ kubeconfig_dir }}/{{ item }}.kubeconfig
+      --kubeconfig={{ kubeconfig_dir }}/{{ item }}.conf
 
     kubectl config set-context kubelet \
       --cluster={{ cluster_name }} \
       --user=system:node:{{ item }} \
-      --kubeconfig={{ kubeconfig_dir }}/{{ item }}.kubeconfig
+      --kubeconfig={{ kubeconfig_dir }}/{{ item }}.conf
 
-    kubectl config use-context kubelet --kubeconfig={{ kubeconfig_dir }}/{{ item }}.kubeconfig
+    kubectl config use-context kubelet --kubeconfig={{ kubeconfig_dir }}/{{ item }}.conf
   args:
-    creates: '{{ kubeconfig_dir }}/{{ item }}.kubeconfig'
+    creates: '{{ kubeconfig_dir }}/{{ item }}.conf'
   loop: "{{ groups['worker'] }}"
 
-- name: Generate kubeconfig file for kube-proxy service
-  shell: |
-    kubectl config set-cluster {{ cluster_name }} \
-      --certificate-authority={{ pki_path }}/ca.pem \
-      --embed-certs=true \
-      --server=https://{{ apis_url }}:6443 \
-      --kubeconfig={{ kubeconfig_dir }}/proxy.kubeconfig
-
-    kubectl config set-credentials system:kube-proxy \
-      --client-certificate={{ pki_k8s_path }}/proxy.pem \
-      --client-key={{ pki_k8s_path }}/proxy-key.pem \
-      --embed-certs=true \
-      --kubeconfig={{ kubeconfig_dir }}/proxy.kubeconfig
-
-    kubectl config set-context proxy \
-      --cluster={{ cluster_name }} \
-      --user=system:kube-proxy \
-      --kubeconfig={{ kubeconfig_dir }}/proxy.kubeconfig
-
-    kubectl config use-context proxy --kubeconfig={{ kubeconfig_dir }}/proxy.kubeconfig
-  args:
-    creates: '{{ kubeconfig_dir }}/proxy.kubeconfig'
-
-- name: Make kubeconfig files accessable
+- name: Be sure kubeconfig file is accessable
   file:
     path: '{{ kubeconfig_dir }}'
     state: directory

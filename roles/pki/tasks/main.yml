@@ -8,14 +8,37 @@
     - '{{ pki_k8s_path }}'
     - '{{ pki_front_proxy }}'
 
+- name: Generate CA private key
+  openssl_privatekey:
+    path: '{{ pki_path }}/ca-key.pem'
+    mode: 0644
+    owner: "{{ lookup('env', 'USER') }}"
+
+- name: Generate CA CSR
+  openssl_csr:
+    path: '{{ pki_path }}/ca.csr'
+    privatekey_path: '{{ pki_path }}/ca-key.pem'
+    basic_constraints: "CA:TRUE"
+    basic_constraints_critical: True
+    key_usage:
+      - cRLSign
+      - keyCertSign
+    key_usage_critical: True
+    common_name: '{{ common_name }}'
+    country_name: '{{ country }}'
+    locality_name: '{{ location }}'
+    organization_name: '{{ organization }}'
+    organizational_unit_name: '{{ organization_unit }}'
+
 - name: Generate CA certificate
-  shell:
-    cmd: |
-      cat << EOF | cfssl gencert -initca - | cfssljson -bare {{ pki_path }}/ca
-      {{ lookup('template', 'ca-csr.json.j2') | to_nice_json(indent=4) }}
-      EOF
-  args:
-    executable: /bin/bash
+  openssl_certificate:
+    path: '{{ pki_path }}/ca.pem'
+    privatekey_path: '{{ pki_path }}/ca-key.pem'
+    csr_path: '{{ pki_path }}/ca.csr'
+    provider: selfsigned
+    ownca_not_after: +{{ expire_days }}
+    mode: 0644
+    owner: "{{ lookup('env', 'USER') }}"
 
 - name: Generate etcd certificate
   include: etcd_pki.yaml
@@ -34,11 +57,3 @@
 
 - name: Generate front proxy certificate
   include: front-proxy.yaml
-
-- name: Make pki files accessable
-  file:
-    path: '{{ pki_path }}'
-    state: directory
-    recurse: Yes
-    mode: 0644
-    owner: "{{ lookup('env', 'USER') }}"

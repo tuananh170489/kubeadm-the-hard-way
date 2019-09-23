@@ -28,8 +28,8 @@
     - apiserver-etcd-client-key.pem
     - apiserver-kubelet-client.pem
     - apiserver-kubelet-client-key.pem
-    - services-accounts.pem
-    - services-accounts-key.pem
+    - sa.pem
+    - sa-key.pem
 
 - name: Copy front proxy certificate to servers
   copy:
@@ -44,8 +44,8 @@
     src: '{{ kubeconfig_dir }}/{{ item }}'
     dest: '{{ kubeconfig_path }}/'
   loop:
-    - controller-manager.kubeconfig
-    - scheduler.kubeconfig
+    - kube-controller-manager.conf
+    - kube-scheduler.conf
 
 - name: Create Kubernetes API Server service
   template:

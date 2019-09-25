@@ -3,7 +3,7 @@
   include: configure.yml
   tags:
     - common_configure
-# - name: Install neccessary packages
-#   include: install.yml
-#   tags:
-#     - common_install
+- name: Install neccessary packages
+  include: install.yml
+  tags:
+    - common_install

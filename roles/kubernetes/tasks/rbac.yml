@@ -1,2 +1,0 @@
-- name: Create RBAC for kubelet
-  command: kubectl apply -f RBAC/kubelet.yaml

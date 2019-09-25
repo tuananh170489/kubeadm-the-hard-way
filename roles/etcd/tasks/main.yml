@@ -1,24 +1,24 @@
-# - name: Download etcd binaries
-#   get_url:
-#     url: https://github.com/etcd-io/etcd/releases/download/v{{ etcd_version }}/etcd-v{{ etcd_version }}-linux-amd64.tar.gz
-#     remote_src: Yes
-#     dest: /tmp/
+- name: Download etcd binaries
+  get_url:
+    url: https://github.com/etcd-io/etcd/releases/download/v{{ etcd_version }}/etcd-v{{ etcd_version }}-linux-amd64.tar.gz
+    remote_src: Yes
+    dest: /tmp/
 
-# - name: Install etcd binaries
-#   unarchive:
-#     remote_src: Yes
-#     src: /tmp/etcd-v{{ etcd_version }}-linux-amd64.tar.gz
-#     dest: /usr/local/bin/
-#     mode: 0755
-#     extra_opts:
-#       - --strip-components=1
-#       - etcd-v{{ etcd_version }}-linux-amd64/etcd
-#       - etcd-v{{ etcd_version }}-linux-amd64/etcdctl
+- name: Install etcd binaries
+  unarchive:
+    remote_src: Yes
+    src: /tmp/etcd-v{{ etcd_version }}-linux-amd64.tar.gz
+    dest: /usr/local/bin/
+    mode: 0755
+    extra_opts:
+      - --strip-components=1
+      - etcd-v{{ etcd_version }}-linux-amd64/etcd
+      - etcd-v{{ etcd_version }}-linux-amd64/etcdctl
 
-# - name: Remove compress tar.gz file
-#   file:
-#     path: /tmp/etcd-v{{ etcd_version }}-linux-amd64.tar.gz
-#     state: absent
+- name: Remove compress tar.gz file
+  file:
+    path: /tmp/etcd-v{{ etcd_version }}-linux-amd64.tar.gz
+    state: absent
 
 - name: Create etcd neccessary directories
   file:

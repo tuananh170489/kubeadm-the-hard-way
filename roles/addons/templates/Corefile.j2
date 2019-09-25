@@ -1,0 +1,19 @@
+.:53 {
+    log
+    errors
+    health
+    kubernetes {{ cluster_domain }} in-addr.arpa ip6.arpa {
+      kubeconfig /etc/kubernetes/config/coredns.conf coredns
+      namespaces kube-system
+      ttl {{ coredns_ttl }}
+      pods insecure
+      upstream
+      fallthrough in-addr.arpa ip6.arpa
+    }
+    prometheus :9153
+    forward . /etc/resolv.conf
+    cache 30
+    loop
+    reload
+    loadbalance
+}

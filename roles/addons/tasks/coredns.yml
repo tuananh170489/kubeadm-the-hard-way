@@ -1,0 +1,61 @@
+- name: Create neccessary directory
+  file:
+    path: '{{ item }}'
+    state: directory
+  loop:
+    - /etc/coredns
+    - /var/lib/coredns
+
+- name: Download CoreDNS
+  get_url:
+    url: https://github.com/coredns/coredns/releases/download/v{{ coredns_version }}/coredns_{{ coredns_version }}_linux_amd64.tgz
+    dest: /tmp/
+
+- name: Install CoreDNS
+  unarchive:
+    remote_src: yes
+    src: /tmp/coredns_{{ coredns_version }}_linux_amd64.tgz
+    dest: /usr/local/bin/
+
+- name: Remove CoreDNS tgz file
+  file:
+    path: /tmp/coredns_{{ coredns_version }}_linux_amd64.tgz
+    state: absent
+
+- name: Create kube-router service account and RBAC
+  shell: kubectl apply -f {{ playbook_dir }}/rbac/coredns.yaml
+  args:
+    executable: /bin/bash
+  delegate_to: localhost
+  become: False
+  run_once: True
+
+- name: Create kubeconfig for kube-router service account
+  shell: '{{ playbook_dir }}/bin/kube-sa-config coredns -n kube-system | tee {{ kubeconfig_dir }}/coredns.conf'
+  args:
+    executable: /bin/bash
+  delegate_to: localhost
+  become: False
+  run_once: True
+
+- name: Copy kube-router kubeconfig file to worker servers
+  copy:
+    src: '{{ kubeconfig_dir }}/coredns.conf'
+    dest: '/etc/kubernetes/config/'
+
+- name: Create CoreDNS config file
+  template:
+    src: Corefile.j2
+    dest: /etc/coredns/Corefile
+
+- name: Create CoreDNS service
+  template:
+    src: coredns.service.j2
+    dest: /etc/systemd/system/coredns.service
+
+- name: Be sure CoreDNS is running and enabled
+  systemd:
+    name: coredns
+    state: started
+    enabled: Yes
+    daemon_reload: Yes

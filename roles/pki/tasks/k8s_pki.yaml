@@ -1,8 +1,6 @@
 - name: Generate apiserver private key
   openssl_privatekey:
     path: '{{ pki_k8s_path }}/apiserver-key.pem'
-    mode: 0644
-    owner: "{{ lookup('env', 'USER') }}"
 
 - name: Generate apiserver CSR
   openssl_csr:
@@ -39,14 +37,10 @@
     ownca_privatekey_path: '{{ pki_path }}/ca-key.pem'
     provider: ownca
     ownca_not_after: +{{ expire_days }}
-    mode: 0644
-    owner: "{{ lookup('env', 'USER') }}"
 
 - name: Generate apiserver-etcd-client private key
   openssl_privatekey:
     path: '{{ pki_k8s_path }}/apiserver-etcd-client-key.pem'
-    mode: 0644
-    owner: "{{ lookup('env', 'USER') }}"
 
 - name: Generate apiserver-etcd-client CSR
   openssl_csr:
@@ -74,14 +68,10 @@
     ownca_privatekey_path: '{{ pki_path }}/ca-key.pem'
     provider: ownca
     ownca_not_after: +{{ expire_days }}
-    mode: 0644
-    owner: "{{ lookup('env', 'USER') }}"
 
 - name: Generate apiserver-kubelet-client private key
   openssl_privatekey:
     path: '{{ pki_k8s_path }}/apiserver-kubelet-client-key.pem'
-    mode: 0644
-    owner: "{{ lookup('env', 'USER') }}"
 
 - name: Generate apiserver-kubelet-client CSR
   openssl_csr:
@@ -109,14 +99,10 @@
     ownca_privatekey_path: '{{ pki_path }}/ca-key.pem'
     provider: ownca
     ownca_not_after: +{{ expire_days }}
-    mode: 0644
-    owner: "{{ lookup('env', 'USER') }}"
 
 - name: Generate admin private key
   openssl_privatekey:
     path: '{{ pki_k8s_path }}/admin-key.pem'
-    mode: 0644
-    owner: "{{ lookup('env', 'USER') }}"
 
 - name: Generate admin CSR
   openssl_csr:
@@ -144,14 +130,10 @@
     ownca_privatekey_path: '{{ pki_path }}/ca-key.pem'
     provider: ownca
     ownca_not_after: +{{ expire_days }}
-    mode: 0644
-    owner: "{{ lookup('env', 'USER') }}"
 
 - name: Generate kube-controller-manager private key
   openssl_privatekey:
     path: '{{ pki_k8s_path }}/kube-controller-manager-key.pem'
-    mode: 0644
-    owner: "{{ lookup('env', 'USER') }}"
 
 - name: Generate kube-controller-manager CSR
   openssl_csr:
@@ -180,14 +162,10 @@
     ownca_privatekey_path: '{{ pki_path }}/ca-key.pem'
     provider: ownca
     ownca_not_after: +{{ expire_days }}
-    mode: 0644
-    owner: "{{ lookup('env', 'USER') }}"
 
 - name: Generate kube-scheduler private key
   openssl_privatekey:
     path: '{{ pki_k8s_path }}/kube-scheduler-key.pem'
-    mode: 0644
-    owner: "{{ lookup('env', 'USER') }}"
 
 - name: Generate kube-scheduler CSR
   openssl_csr:
@@ -216,14 +194,10 @@
     ownca_privatekey_path: '{{ pki_path }}/ca-key.pem'
     provider: ownca
     ownca_not_after: +{{ expire_days }}
-    mode: 0644
-    owner: "{{ lookup('env', 'USER') }}"
 
 - name: Generate service accounts private key
   openssl_privatekey:
     path: '{{ pki_k8s_path }}/sa-key.pem'
-    mode: 0644
-    owner: "{{ lookup('env', 'USER') }}"
 
 - name: Generate service accounts CSR
   openssl_csr:
@@ -251,14 +225,10 @@
     ownca_privatekey_path: '{{ pki_path }}/ca-key.pem'
     provider: ownca
     ownca_not_after: +{{ expire_days }}
-    mode: 0644
-    owner: "{{ lookup('env', 'USER') }}"
 
 - name: Generate kubelet private key
   openssl_privatekey:
     path: '{{ pki_k8s_path }}/{{ item }}-key.pem'
-    mode: 0644
-    owner: "{{ lookup('env', 'USER') }}"
   loop: "{{ groups['worker'] }}"
 
 - name: Generate kubelet CSR
@@ -290,6 +260,4 @@
     ownca_privatekey_path: '{{ pki_path }}/ca-key.pem'
     provider: ownca
     ownca_not_after: +{{ expire_days }}
-    mode: 0644
-    owner: "{{ lookup('env', 'USER') }}"
   loop: "{{ groups['worker'] }}"

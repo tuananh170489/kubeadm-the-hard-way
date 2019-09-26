@@ -11,8 +11,6 @@
 - name: Generate CA private key
   openssl_privatekey:
     path: '{{ pki_path }}/ca-key.pem'
-    mode: 0644
-    owner: "{{ lookup('env', 'USER') }}"
 
 - name: Generate CA CSR
   openssl_csr:
@@ -37,8 +35,6 @@
     csr_path: '{{ pki_path }}/ca.csr'
     provider: selfsigned
     ownca_not_after: +{{ expire_days }}
-    mode: 0644
-    owner: "{{ lookup('env', 'USER') }}"
 
 - name: Generate etcd certificate
   include: etcd_pki.yaml

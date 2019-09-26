@@ -1,8 +1,6 @@
 - name: Generate front-proxy-client private key
   openssl_privatekey:
     path: '{{ pki_front_proxy }}/front-proxy-client-key.pem'
-    mode: 0644
-    owner: "{{ lookup('env', 'USER') }}"
 
 - name: Generate front-proxy-client CSR
   openssl_csr:
@@ -30,5 +28,3 @@
     ownca_privatekey_path: '{{ pki_path }}/front-proxy-ca-key.pem'
     provider: ownca
     ownca_not_after: +{{ expire_days }}
-    mode: 0644
-    owner: "{{ lookup('env', 'USER') }}"

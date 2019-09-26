@@ -1,8 +1,6 @@
 - name: Generate etcd private key
   openssl_privatekey:
     path: '{{ pki_etcd_path }}/etcd-key.pem'
-    mode: 0644
-    owner: "{{ lookup('env', 'USER') }}"
 
 - name: Generate etcd CSR
   openssl_csr:
@@ -34,14 +32,10 @@
     ownca_privatekey_path: '{{ pki_path }}/ca-key.pem'
     provider: ownca
     ownca_not_after: +{{ expire_days }}
-    mode: 0644
-    owner: "{{ lookup('env', 'USER') }}"
 
 - name: Generate etcd-peer private key
   openssl_privatekey:
     path: '{{ pki_etcd_path }}/etcd-peer-key.pem'
-    mode: 0644
-    owner: "{{ lookup('env', 'USER') }}"
 
 - name: Generate etcd-peer CSR
   openssl_csr:
@@ -74,14 +68,10 @@
     ownca_privatekey_path: '{{ pki_path }}/ca-key.pem'
     provider: ownca
     ownca_not_after: +{{ expire_days }}
-    mode: 0644
-    owner: "{{ lookup('env', 'USER') }}"
 
 - name: Generate etcd-healthcheck-client private key
   openssl_privatekey:
     path: '{{ pki_etcd_path }}/etcd-healthcheck-client-key.pem'
-    mode: 0644
-    owner: "{{ lookup('env', 'USER') }}"
 
 - name: Generate etcd-healthcheck-client CSR
   openssl_csr:
@@ -110,5 +100,3 @@
     ownca_privatekey_path: '{{ pki_path }}/ca-key.pem'
     provider: ownca
     ownca_not_after: +{{ expire_days }}
-    mode: 0644
-    owner: "{{ lookup('env', 'USER') }}"

@@ -4,17 +4,15 @@
     path: /etc/ssh/sshd_config
     regexp: '^X11Forwarding'
     line: 'X11Forwarding no'
-    backrefs: yes
+    backrefs: Yes
     validate: '/usr/sbin/sshd -f %s -t'
-  tags: ssh
 
 - name: Disable GSSAPIAuthentication
   lineinfile:
     path: /etc/ssh/sshd_config
     regexp: '^#GSSAPIAuthentication'
     line: 'GSSAPIAuthentication no'
-    backrefs: yes
+    backrefs: Yes
     validate: '/usr/sbin/sshd -f %s -t'
   notify:
     - restart ssh
-  tags: ssh

@@ -10,4 +10,5 @@
     state: present
     update_cache: yes
     install_recommends: no
+    force_apt_get: Yes
   when: dns is succeeded

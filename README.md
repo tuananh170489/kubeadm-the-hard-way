@@ -1,1 +1,0 @@
-# Kubernetes The Hard Way (remake)

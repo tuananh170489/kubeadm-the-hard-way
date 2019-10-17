@@ -10,7 +10,7 @@ worker
 k8s-lb
 
 [master]
-k8s-master-[01:02]
+k8s-master-01
 
 [worker]
-k8s-worker-[01:02]
+k8s-worker-[01:03]

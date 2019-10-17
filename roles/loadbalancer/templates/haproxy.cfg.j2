@@ -1,8 +1,9 @@
+#jinja2: lstrip_blocks: True, trim_blocks: True
 #---------------------------------------------------------------------
 # Global settings
 #---------------------------------------------------------------------
 global
-  log         {{ haproxy_log_setting }}
+  log         {{ haproxy.log_setting }}
   chroot      /var/lib/haproxy
   pidfile     /var/run/haproxy.pid
   user        haproxy

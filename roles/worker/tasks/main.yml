@@ -2,7 +2,7 @@
   file:
     path: '{{ item }}'
     state: directory
-    recurse: yes
+    recurse: Yes
   loop:
     - /etc/cni/net.d
     - /etc/containerd
@@ -18,7 +18,7 @@
       - conntrack
       - ipset
     state: present
-    update_cache: yes
+    update_cache: Yes
     install_recommends: no
 
 - name: Download kubelet binaries
@@ -37,13 +37,13 @@
 
 - name: Install CNI plugins
   unarchive:
-    remote_src: yes
+    remote_src: Yes
     src: /tmp/cni-plugins-linux-amd64-v{{ cni_version }}.tgz
     dest: /opt/cni/bin/
 
 - name: Install CRI plugins
   unarchive:
-    remote_src: yes
+    remote_src: Yes
     src: /tmp/cri-containerd-{{ cri_version }}.linux-amd64.tar.gz
     dest: /
     mode: 0755

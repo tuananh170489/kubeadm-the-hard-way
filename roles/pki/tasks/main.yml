@@ -52,4 +52,7 @@
     - { src: '{{ pki_path }}/ca-key.pem', dest: '{{ pki_path }}/front-proxy-ca-key.pem' }
 
 - name: Generate front proxy certificate
-  include: front-proxy.yaml
+  include: front-proxy.yml
+
+- name: Generate harbor certificate
+  include: harbor.yml

@@ -1,3 +1,2 @@
-- name: Deploy CoreDNS to the cluster
-  include: coredns.yml
-  when: coredns_version is defined
+# - name: Deploy descheduler to the cluster
+#   include: descheduler.yml

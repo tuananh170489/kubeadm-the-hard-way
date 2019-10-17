@@ -1,13 +1,13 @@
 - name: Create sudo file
   file:
-      path: /etc/sudoers.d/{{ ssh_user }}
+      path: /etc/sudoers.d/{{ sudo_user }}
       state: touch
 
 - name: Sudo without password
   lineinfile:
-    path: /etc/sudoers.d/{{ ssh_user }}
+    path: /etc/sudoers.d/{{ sudo_user }}
     insertbefore: BOF
-    line: '{{ ssh_user }} ALL=(ALL:ALL) NOPASSWD: ALL'
+    line: '{{ sudo_user }} ALL=(ALL:ALL) NOPASSWD: ALL'
     validate: '/usr/sbin/visudo -cf %s'
 
 - name: Disable Ctrl Alt Del reboot
@@ -47,7 +47,7 @@
   copy:
     src: resolv.conf
     dest: /etc/resolv.conf
-#   register: dns
+  register: dns
 
 - name: Setting up timezone
   shell: timedatectl set-timezone Asia/Ho_Chi_Minh

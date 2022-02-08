@@ -1,0 +1,31 @@
+- name: Generate CA certificate
+  include: pki_ca.yml
+  delegate_to: localhost
+  run_once: True
+
+- name: Generate service accounts key pair
+  include: pki_sa.yml
+  delegate_to: localhost
+  run_once: True
+
+- name: Generate certificate for etcd cluster
+  include: pki_etcd.yml
+  when: inventory_hostname in groups['etcd']
+
+- name: Generate kubernetes control plane certificate
+  include: pki_master.yml
+  when: inventory_hostname in groups['master']
+
+- name: Generate front-proxy certificate
+  include: pki_front_proxy.yml
+  when: inventory_hostname in groups['master']
+
+- name: Generate kubernetes workers certificate
+  include: pki_worker.yml
+  when: (inventory_hostname in groups['master']) or (inventory_hostname in groups['worker'])
+
+- name: Generate certificate for admin user
+  include: pki_admin.yml
+  run_once: True
+  delegate_to: localhost
+  become: False

@@ -1,0 +1,741 @@
+#jinja2: lstrip_blocks: False, trim_blocks: False
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-server-conf
+  labels:
+    app.kubernetes.io/name: prometheus
+  namespace: monitoring
+data:
+  nodes.yml: |
+    - labels:
+        job: nodes
+      targets:
+      {% for host in groups['all'] -%}
+      - {{ host }}:9100
+      {% endfor %}
+  prometheus.rules: |
+    {% raw -%}
+    groups:
+    - name: etcd-rules
+      rules:
+      - alert: Etcd No Leader
+        expr: etcd_server_has_leader{job=~".*etcd.*"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: Etcd have no leader
+          description: "Etcd cluster have no leader. Please check it right now"
+      - alert: Etcd Members Down
+        expr: max without (endpoint) (sum without (instance) (up{job=~".*etcd.*"} == bool 0) or count without (To) (sum without (instance) (rate(etcd_network_peer_sent_failures_total{job=~".*etcd.*"}[120s])) > 0.01)) > 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: Etcd members down
+          description: "Etcd members are down {{ $value }}"
+      - alert: Etcd Insufficient Members
+        expr: sum(up{job=~".*etcd.*"} == bool 1) without (instance) < ((count(up{job=~".*etcd.*"}) without (instance) + 1) / 2)
+        for: 3m
+        labels:
+          severity: critical
+        annotations:
+          summary: Etcd cluster has insufficient number of members
+          description: "Etcd members are insufficient {{ $value }}"
+      - alert: Etcd High Number Of Leader Changes
+        expr: increase((max without (instance) (etcd_server_leader_changes_seen_total{job=~".*etcd.*"}) or 0*absent(etcd_server_leader_changes_seen_total{job=~".*etcd.*"}))[15m:1m]) >= 4
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: Etcd cluster high number of leader changes
+          description: "Etcd members {{ $value }} leader changes within the last 15 minutes. Frequent elections may be a sign of insufficient resources, high network latency, or disruptions by other components and should be investigated"
+      - alert: Etcd High Number Of Failed GRPC Requests
+        expr: 100 * sum(rate(grpc_server_handled_total{job=~".*etcd.*", grpc_code=~"Unknown|FailedPrecondition|ResourceExhausted|Internal|Unavailable|DataLoss|DeadlineExceeded"}[5m])) without (grpc_type, grpc_code) / sum(rate(grpc_server_handled_total{job=~".*etcd.*"}[5m])) without (grpc_type, grpc_code) > 1
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: Etcd cluster has high number of failed grpc requests
+          description: "{{ $value }}% of requests in etcd cluster for {{ $labels.grpc_method }} failed on etcd instance {{ $labels.instance }}"
+      - alert: Etcd GRPC Requests Slow
+        expr: histogram_quantile(0.99, sum(rate(grpc_server_handling_seconds_bucket{job=~".*etcd.*", grpc_method!="Defragment", grpc_type="unary"}[5m])) without(grpc_type)) > 0.15
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: Etcd cluster grpc requests are slow
+          description: "99th percentile of gRPC requests in etcd cluster is {{ $value }}s on etcd instance {{ $labels.instance }} for {{ $labels.grpc_method }} method"
+      - alert: Etcd Member Communication Slow
+        expr: histogram_quantile(0.99, rate(etcd_network_peer_round_trip_time_seconds_bucket{job=~".*etcd.*"}[5m])) > 0.15
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: Etcd cluster member communication is slow
+          description: "etcd cluster member communication with {{ $labels.To }} is taking {{ $value }}s on etcd instance {{ $labels.instance }}"
+      - alert: Etcd High Number Of Failed Proposals
+        expr: rate(etcd_server_proposals_failed_total{job=~".*etcd.*"}[15m]) > 5
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: Etcd cluster has high number of proposal failures
+          description: "{{ $value }} proposal failures within the last 30 minutes on etcd instance {{ $labels.instance }}"
+      - alert: Etcd High Fsync Durations
+        expr: histogram_quantile(0.99, rate(etcd_disk_wal_fsync_duration_seconds_bucket{job=~".*etcd.*"}[5m])) > 0.5
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: Etcd cluster 99th percentile fsync durations are too high
+          description: "99th percentile fsync durations are {{ $value }}s on etcd instance {{ $labels.instance }}"
+      - alert: Etcd High Commit Durations
+        expr: histogram_quantile(0.99, rate(etcd_disk_backend_commit_duration_seconds_bucket{job=~".*etcd.*"}[5m])) > 0.25
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: Etcd cluster 99th percentile commit durations are too high
+          description: "99th percentile commit durations {{ $value }}s on etcd instance {{ $labels.instance }}"
+      - alert: Etcd Backend Quota Low Space
+        expr: (etcd_mvcc_db_total_size_in_bytes/etcd_server_quota_backend_bytes)*100 > 95
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: Backend of etcd cluster low space quota
+          description: "Database size of etcd cluster exceeds the defined quota on etcd instance {{ $labels.instance }}, please defrag or increase the quota as the writes to etcd will be disabled when it is full"
+      - alert: Etcd Excessive Database Growth
+        expr: increase(((etcd_mvcc_db_total_size_in_bytes/etcd_server_quota_backend_bytes)*100)[240m:1m]) > 50
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: Etcd cluster leading to 50% increase in database size
+          description: "Observed surge in etcd writes leading to 50% increase in database size over the past four hours on etcd instance {{ $labels.instance }}, please check as it might be disruptive"
+    - name: coredns-rules
+      rules:
+      - alert: CoreDNS Latency High
+        expr: histogram_quantile(0.99, sum(rate(coredns_dns_request_duration_seconds_bucket{job="kube-dns"}[5m])) by(server, zone, le)) > 4
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: CoreDNS latency high
+          description: "CoreDNS has 99th percentile latency of {{ $value }} seconds for {{ $labels.server }} zone {{ $labels.zone }}"
+      - alert: CoreDNS Forward Latency High
+        expr: histogram_quantile(0.99, sum(rate(coredns_forward_request_duration_seconds_bucket{job="kube-dns"}[5m])) by(to, le)) > 4
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: CoreDNS forward latency high
+          description: "CoreDNS has 99th percentile latency of {{ $value }} seconds forwarding requests to {{ $labels.to }}"
+      - alert: CoreDNS Errors High
+        expr: sum(rate(coredns_dns_responses_total{job="kube-dns",rcode="SERVFAIL"}[5m])) / sum(rate(coredns_dns_responses_total{job="kube-dns"}[5m])) > 0.03
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: CoreDNS errors high
+          description: "CoreDNS is returning SERVFAIL for {{ $value | humanizePercentage }}"
+      - alert: CoreDNS Forward Errors High
+        expr: sum(rate(coredns_forward_responses_total{job="kube-dns",rcode="SERVFAIL"}[5m])) / sum(rate(coredns_forward_responses_total{job="kube-dns"}[5m])) > 0.03
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: CoreDNS forward errors high
+          description: "CoreDNS is returning SERVFAIL for {{ $value | humanizePercentage }} of forward requests to {{ $labels.to }}"
+      - alert: CoreDNS Forward Healthcheck Failure Count
+        expr: sum(rate(coredns_forward_healthcheck_failures_total{job="kube-dns"}[5m])) by (to) > 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: CoreDNS forward health check failure count
+          description: "CoreDNS health checks have failed to upstream server {{ $labels.to }}"
+      - alert: CoreDNS Forward Healthcheck Broken Count
+        expr: sum(rate(coredns_forward_healthcheck_broken_total{job="kube-dns"}[5m])) > 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: CoreDNS forward health check broken count
+          description: "CoreDNS health checks have failed for all upstream servers"
+    - name: kafka-rules
+      rules:
+      - alert: Heap Use Too Much
+        expr: (jvm_memory_bytes_used{area="heap"} / jvm_memory_bytes_max) * 100 > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: JVM instance {{ $labels.instance }} memory usage > 80%
+          description: "Heap usage of {{ $labels.instance }} over 80%, current usage {{ $value }}"
+      - alert: Kafka Topics Replicas
+        expr: sum(kafka_topic_partition_in_sync_replica) by (topic) < 3
+        for: 30s
+        labels:
+          severity: warning
+        annotations:
+          summary: Kafka topics replicas
+          description: "Kafka topic in-sync partition is {{ $value }} in {{ $labels.instance }}"
+      - alert: Too Large Consumer Group Lag
+        expr: kafka_consumergroup_lag > 1000
+        for: 30s
+        labels:
+          severity: warning
+        annotations:
+          summary: Consumer group lag is too big
+          description: "Consumer group {{ $labels.consumergroup}} lag is too big ({{ $value }}) on topic {{ $labels.topic }}/partition {{ $labels.partition }}"
+      - alert: Under Replicated Partitions
+        expr: kafka_server_replicamanager_underreplicatedpartitions > 0
+        for: 30s
+        labels:
+          severity: warning
+        annotations:
+          summary: Kafka under replicated partitions
+          description: "There are {{ $value }} under replicated partitions on {{ $labels.instance }}"
+      - alert: Abnormal Controller State
+        expr: sum without (instance) (kafka_controller_kafkacontroller_activecontrollercount) == 0
+        for: 30s
+        labels:
+          severity: warning
+        annotations:
+          summary: Kafka abnormal controller state
+          description: "There are {{ $value }} active controllers in the kafka cluster"
+      - alert: Offline Partitions
+        expr: sum(kafka_controller_kafkacontroller_offlinepartitionscount) > 0
+        for: 30s
+        labels:
+          severity: warning
+        annotations:
+          summary: Kafka offline partitions
+          description: "One or more partitions have no leader"
+      - alert: Under Min Isr Partition Count
+        expr: kafka_server_replicamanager_underminisrpartitioncount > 0
+        for: 30s
+        labels:
+          severity: warning
+        annotations:
+          summary: Kafka under min ISR partitions
+          description: "There are {{ $value }} partitions under the min ISR on {{ $labels.instance }}"
+      - alert: Offline Log Directory Count
+        expr: kafka_log_logmanager_offlinelogdirectorycount > 0
+        for: 30s
+        labels:
+          severity: warning
+        annotations:
+          summary: Kafka offline log directories
+          description: "There are {{ $value }} offline log directories on {{ $labels.instance }}"
+      - alert: No Message For Too Long
+        expr: changes(kafka_topic_partition_current_offset{topic!="__consumer_offsets"}[10m]) == 0
+        for: 30s
+        labels:
+          severity: warning
+        annotations:
+          summary: No message for 10 minutes
+          description: "There is no messages in topic {{ $labels.topic}}/partition {{ $labels.partition }} for 10 minutes"
+    - name: keepalived-rules
+      rules:
+      - alert: Keepalived Server Down
+        expr: keepalived_up == 0
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: Keepalived server down
+          description: "Keepalived instance {{ $labels.instance }} is down"
+      - alert: Keepalived Advertisements Errors
+        expr: sum(keepalived_advertisements_interval_errors_total) by (instance) > 0
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: Keepalived advertisements errors
+          description: "Keepalived advertisements had been errors {{ $value }}"
+    - name: haproxy-rules
+      rules:
+      - alert: Haproxy Server Down
+        expr: haproxy_backend_active_servers == 0
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: HAProxy server down
+          description: "HAProxy backend {{ $labels.proxy }} is down"
+      - alert: Haproxy Server Response Errors
+        expr: (sum by (server) (rate(haproxy_server_response_errors_total[1m])) / sum by (server) (rate(haproxy_server_http_responses_total[1m]))) * 100 > 5
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: HAProxy server response errors
+          description: "Too many response errors to {{ $labels.proxy }} server (> 5%)"
+      - alert: Haproxy Backend Connection Errors
+        expr: (sum by (proxy) (rate(haproxy_backend_connection_errors_total[1m]))) > 100
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: HAProxy backend connection errors
+          description: "Too many connection errors to {{ $labels.proxy }} backend (> 100 req/s). Request throughput may be to high"
+      - alert: Haproxy Server Connection Errors
+        expr: (sum by (proxy) (rate(haproxy_backend_connection_errors_total[1m]))) > 100
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: HAProxy server connection errors
+          description: "Too many connection errors to {{ $labels.proxy }} server (> 100 req/s). Request throughput may be to high"
+      - alert: Haproxy Pending Requests
+        expr: sum by (proxy) (rate(haproxy_backend_current_queue[2m])) > 0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: HAProxy pending requests
+          description: "Some HAProxy requests are pending on {{ $labels.proxy }} backend"
+    - name: node-rules
+      rules:
+      - alert: Host Out Of Disk Space
+        expr: (node_filesystem_avail_bytes * 100) / node_filesystem_size_bytes < 10 and ON (instance, device, mountpoint) node_filesystem_readonly == 0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: Host out of disk space
+          description: "Disk in {{ $labels.instance }} is almost full (< 10% left)"
+      - alert: Host Systemd Service Crashed
+        expr: node_systemd_unit_state{state="failed"} == 1
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: Host systemd service crashed
+          description: "Service {{ $labels.name }} in {{ $labels.instance }} is crashed"
+      - alert: Host OOM Kill Detected
+        expr: increase(node_vmstat_oom_kill[1m]) > 0
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: Host OOM kill detected
+          description: "OOM kill detected in {{ $labels.instance }}"
+      - alert: Host Conntrack Limit
+        expr: node_nf_conntrack_entries / node_nf_conntrack_entries_limit > 0.8
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: Host conntrack limit
+          description: "The number of conntrack in {{ $labels.instance }} is approching limit"
+      - alert: Host Clock Skew
+        expr: (node_timex_offset_seconds > 0.05 and deriv(node_timex_offset_seconds[5m]) >= 0) or (node_timex_offset_seconds < -0.05 and deriv(node_timex_offset_seconds[5m]) <= 0)
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: Host clock skew
+          description: "Clock skew detected. Clock in {{ $labels.instance }} is out of sync"
+      - alert: Host Clock Not Synchronising
+        expr: min_over_time(node_timex_sync_status[1m]) == 0 and node_timex_maxerror_seconds >= 16
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: Host clock not synchronising
+          description: "Clock in {{ $labels.instance }} is not synchronising"
+      - alert: Host Out Of Memory
+        expr: node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes * 100 < 10
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: Host out of memory
+          description: "Memory in {{ $labels.instance }} is filling up (< 10% left)"
+      - alert: Host Unusual Disk Read Rate
+        expr: sum by (instance) (rate(node_disk_read_bytes_total[2m])) / 1024 / 1024 > 50
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: Host unusual disk read rate
+          description: "Disk in {{ $labels.instance }} is probably reading too much data (> 50 MB/s)"
+      - alert: Host Unusual Network Throughput In
+        expr: sum by (instance) (rate(node_network_receive_bytes_total[2m])) / 1024 / 1024 > 100
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: Host unusual network throughput in
+          description: "{{ $labels.instance }} had network interfaces are probably receiving too much data (> 100 MB/s)"
+      - alert: Host Unusual Network Throughput Out
+        expr: sum by (instance) (rate(node_network_transmit_bytes_total[2m])) / 1024 / 1024 > 100
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: Host unusual network throughput out
+          description: "{{ $labels.instance }} had network interfaces are probably sending too much data (> 100 MB/s)"
+      - alert: Host Unusual Disk Read Latency
+        expr: rate(node_disk_read_time_seconds_total[1m]) / rate(node_disk_reads_completed_total[1m]) > 0.1 and rate(node_disk_reads_completed_total[1m]) > 0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: Host unusual disk read latency (instance {{ $labels.instance }})
+          description: "Disk latency in {{ $labels.instance }} is growing (read operations > 100ms)"
+      - alert: Host Unusual Disk Write Latency
+        expr: rate(node_disk_write_time_seconds_total[1m]) / rate(node_disk_writes_completed_total[1m]) > 0.1 and rate(node_disk_writes_completed_total[1m]) > 0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: Host unusual disk write latency
+          description: "Disk latency in {{ $labels.instance }} is growing (write operations > 100ms)"
+      - alert: Host High Cpu Load
+        expr: 100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[2m])) * 100) > 80
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: Host high CPU load
+          description: "{{ $labels.instance }} had CPU load is > 80%"
+      - alert: Load Average 5 minutes
+        expr: node_load5 / count by (instance, job) (node_cpu_seconds_total{mode="idle"}) >= 0.95
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: Load Average 5 minutes
+          description: "{{ $labels.instance }} is high load"
+      - alert: Host Cpu Steal Noisy Neighbor
+        expr: avg by(instance) (rate(node_cpu_seconds_total{mode="steal"}[5m])) * 100 > 10
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: Host CPU steal noisy neighbor (instance {{ $labels.instance }})
+          description: "{{ $labels.instance }} had CPU steal is > 10%. A noisy neighbor is killing VM performances or a spot instance may be out of credit"
+    - name: kubernetes-rules
+      rules:
+      - alert: Kubernetes Pods Crash Looping
+        expr: max_over_time(kube_pod_container_status_waiting_reason{reason="CrashLoopBackOff"}[5m]) >= 1
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: Kubernetes pod crash looping
+          description: "Pod {{ $labels.pod }} in namespace {{ $labels.namespace }} ({{ $labels.container }}) is in waiting state (reason: 'CrashLoopBackOff')"
+      - alert: Kubernetes Pods Not Healthy
+        expr: min_over_time(sum by (namespace, pod) (kube_pod_status_phase{phase=~"Pending|Unknown|Failed"})[1h:]) > 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: Kubernetes pod not healthy
+          description: "Pod {{ $labels.pod }} in namespace {{ $labels.namespace }} has been in a non-ready state for longer than an hour"
+      - alert: Kubernetes Out Of Capacity
+        expr: sum(kube_pod_info) by (node) / sum(kube_node_status_allocatable) by (node) * 100 > 90
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: Kubernetes out of capacity
+          description: "{{ $labels.node }} is out of capacity"
+      - alert: Kubernetes Node Status
+        expr: kube_node_status_condition{condition="Ready",status="true"} == 0
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: Kubernetes node status
+          description: "Node {{ $labels.node }} has been unready for a long time"
+      - alert: Container CPU Usage
+        expr: (sum(rate(container_cpu_usage_seconds_total{name!=""}[3m])) by (pod) * 100) > 80
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: Container CPU usage
+          description: "Container {{ $labels.pod }} with CPU usage is above 80%"
+      - alert: Container Memory Usage
+        expr: (sum(container_memory_working_set_bytes{name!=""}) BY (instance, name) / sum(container_spec_memory_limit_bytes{name!=""} > 0) BY (instance, name) * 100) > 80
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: Container memory usage
+          description: "Container {{ $labels.name }} with memory usage is above 80%"
+    {% endraw %}
+  prometheus.yml: |
+    global:
+      scrape_interval: 15s
+      evaluation_interval: 10s
+      scrape_timeout: 10s
+
+    alerting:
+      alertmanagers:
+      - static_configs:
+        - targets:
+          {% for host in groups['elasticsearch'] -%}
+          - am{{ groups['elasticsearch'].index(host) + 1 }}.service.prod.xinhxinh.live:9093
+          {% endfor %}
+
+    rule_files:
+    - prometheus.rules
+
+    remote_write:
+    - url: http://vmauth.monitoring.svc:8427/api/v1/write
+      basic_auth:
+        username: prometheus
+        password: cHJvbWV0aGV1cwo=
+      queue_config:
+        max_samples_per_send: 10000
+        capacity: 20000
+        max_shards: 30
+
+    scrape_configs:
+    - job_name: kafka-jmx
+      static_configs:
+      - targets:
+        {% for host in groups['kafka'] -%}
+        - {{ host }}:7072
+        {% endfor %}
+      metrics_path: /metrics
+      relabel_configs:
+      - source_labels: [__address__]
+        regex: ([^:]+)(:[0-9]+)?
+        target_label: instance
+        replacement: $1
+
+    - job_name: kafka-exporter
+      static_configs:
+      - targets:
+        - kafka-exporter.monitoring.svc:9308
+      metrics_path: /metrics
+      relabel_configs:
+      - source_labels: [__address__]
+        regex: ([^:]+)(:[0-9]+)?
+        target_label: instance
+        replacement: $1
+
+    - job_name: redis-cluster
+      static_configs:
+      - targets:
+        - redis://redis1.service.prod.xinhxinh.live:6379
+        - redis://redis2.service.prod.xinhxinh.live:6379
+        - redis://redis3.service.prod.xinhxinh.live:6379
+        - redis://redis4.service.prod.xinhxinh.live:9736
+        - redis://redis5.service.prod.xinhxinh.live:9736
+        - redis://redis6.service.prod.xinhxinh.live:9736
+      metrics_path: /scrape
+      relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: redis-exporter.monitoring.svc:9121
+
+    - job_name: redis-exporter
+      static_configs:
+      - targets:
+        - redis-exporter.monitoring.svc:9121
+
+    - job_name: 'etcd'
+      static_configs:
+      - targets:
+        {% for host in groups['etcd'] -%}
+        - etcd{{ groups['etcd'].index(host) + 1 }}.prod.k8s.xinhxinh.live:2379
+        {% endfor %}
+      scheme: https
+      tls_config:
+        ca_file: /etc/prometheus/certs/ca.crt
+        cert_file: /etc/prometheus/certs/apiserver-etcd-client.crt
+        key_file: /etc/prometheus/certs/apiserver-etcd-client.key
+      bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+      relabel_configs:
+      - source_labels: [__address__]
+        regex: ([^:]+)(:[0-9]+)?
+        target_label: instance
+        replacement: $1
+
+    - job_name: 'keepalived'
+      static_configs:
+      - targets:
+        {% for host in groups['lb'] -%}
+        - {{ host }}:9165
+        {% endfor %}
+      relabel_configs:
+      - source_labels: [__address__]
+        regex: ([^:]+)(:[0-9]+)?
+        target_label: instance
+        replacement: $1
+
+    - job_name: 'load balancer'
+      static_configs:
+      - targets:
+        {% for host in groups['lb'] -%}
+        - {{ host }}:8404
+        {% endfor %}
+      relabel_configs:
+      - source_labels: [__address__]
+        regex: ([^:]+)(:[0-9]+)?
+        target_label: instance
+        replacement: $1
+
+    - job_name: 'nodes'
+      file_sd_configs:
+      - files:
+        - "nodes.yml"
+      relabel_configs:
+      - source_labels: [__address__]
+        regex: ([^:]+)(:[0-9]+)?
+        target_label: instance
+        replacement: $1
+
+    - job_name: 'kubernetes-apiservers'
+      kubernetes_sd_configs:
+      - role: endpoints
+      scheme: https
+      tls_config:
+        ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+      bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+      relabel_configs:
+      - source_labels: [__meta_kubernetes_namespace, __meta_kubernetes_service_name, __meta_kubernetes_endpoint_port_name]
+        action: keep
+        regex: default;kubernetes;https
+      - target_label: __address__
+        replacement: apis.prod.k8s.xinhxinh.live
+      - source_labels: [__address__]
+        regex: ([^:]+)(:[0-9]+)?
+        target_label: instance
+        replacement: $1
+
+    - job_name: 'kubernetes-nodes'
+      scheme: https
+      tls_config:
+        ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+      bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+      kubernetes_sd_configs:
+      - role: node
+      relabel_configs:
+      - action: labelmap
+        regex: __meta_kubernetes_node_label_(.+)
+      - target_label: __address__
+        replacement: kubernetes.default.svc:443
+      - source_labels: [__meta_kubernetes_node_name]
+        regex: (.+)
+        target_label: __metrics_path__
+        replacement: /api/v1/nodes/${1}/proxy/metrics
+
+    - job_name: 'kubernetes-pods'
+      kubernetes_sd_configs:
+      - role: pod
+      relabel_configs:
+      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+        action: keep
+        regex: true
+      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+        action: replace
+        target_label: __metrics_path__
+        regex: (.+)
+      - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+        action: replace
+        regex: ([^:]+)(?::\d+)?;(\d+)
+        replacement: $1:$2
+        target_label: __address__
+      - action: labelmap
+        regex: __meta_kubernetes_pod_label_(.+)
+      - source_labels: [__meta_kubernetes_namespace]
+        action: replace
+        target_label: kubernetes_namespace
+      - source_labels: [__meta_kubernetes_pod_name]
+        action: replace
+        target_label: kubernetes_pod_name
+      - source_labels: [__address__]
+        regex: ([^:]+)(:[0-9]+)?
+        target_label: instance
+        replacement: $1
+
+    - job_name: 'kubernetes-cadvisor'
+      scheme: https
+      tls_config:
+        ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+      bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+      kubernetes_sd_configs:
+      - role: node
+      relabel_configs:
+      - action: labelmap
+        regex: __meta_kubernetes_node_label_(.+)
+      - target_label: __address__
+        replacement: kubernetes.default.svc:443
+      - source_labels: [__meta_kubernetes_node_name]
+        regex: (.+)
+        target_label: __metrics_path__
+        replacement: /api/v1/nodes/${1}/proxy/metrics/cadvisor
+
+    - job_name: 'kubernetes-service-endpoints'
+      kubernetes_sd_configs:
+      - role: endpoints
+      relabel_configs:
+      - source_labels: [__meta_kubernetes_service_annotation_prometheus_io_scrape]
+        action: keep
+        regex: true
+      - source_labels: [__meta_kubernetes_service_annotation_prometheus_io_scheme]
+        action: replace
+        target_label: __scheme__
+        regex: (https?)
+      - source_labels: [__meta_kubernetes_service_annotation_prometheus_io_path]
+        action: replace
+        target_label: __metrics_path__
+        regex: (.+)
+      - source_labels: [__address__, __meta_kubernetes_service_annotation_prometheus_io_port]
+        action: replace
+        target_label: __address__
+        regex: ([^:]+)(?::\d+)?;(\d+)
+        replacement: $1:$2
+      - action: labelmap
+        regex: __meta_kubernetes_service_label_(.+)
+      - source_labels: [__meta_kubernetes_namespace]
+        action: replace
+        target_label: kubernetes_namespace
+      - source_labels: [__meta_kubernetes_service_name]
+        action: replace
+        target_label: kubernetes_name
+      - source_labels: [__address__]
+        regex: ([^:]+)(:[0-9]+)?
+        target_label: instance
+        replacement: $1
+
+    - job_name: kube-dns
+      kubernetes_sd_configs:
+      - role: pod
+      relabel_configs:
+      - action: keep
+        source_labels: [__meta_kubernetes_namespace, __meta_kubernetes_pod_name]
+        separator: /
+        regex: kube-system/coredns.+
+      - source_labels: [__meta_kubernetes_pod_container_port_name]
+        action: keep
+        regex: metrics
+      - source_labels: [__meta_kubernetes_pod_name]
+        action: replace
+        target_label: instance
+      - action: labelmap
+        regex: __meta_kubernetes_pod_label_(.+)
+
+    - job_name: 'kube-state-metrics'
+      static_configs:
+      - targets:
+        - kube-state-metrics.kube-system.svc:8080
+      relabel_configs:
+      - source_labels: [__address__]
+        regex: ([^:]+)(:[0-9]+)?
+        target_label: instance
+        replacement: $1

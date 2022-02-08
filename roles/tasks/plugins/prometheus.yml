@@ -1,0 +1,230 @@
+- name: Create prometheus service account
+  kubernetes.core.k8s:
+    kubeconfig: ~/.kube/config
+    state: present
+    definition:
+      apiVersion: v1
+      kind: ServiceAccount
+      metadata:
+        name: prometheus
+        namespace: monitoring
+        labels:
+          app.kubernetes.io/name: prometheus
+
+- name: Create prometheus ClusterRole
+  kubernetes.core.k8s:
+    kubeconfig: ~/.kube/config
+    state: present
+    definition:
+      apiVersion: rbac.authorization.k8s.io/v1
+      kind: ClusterRole
+      metadata:
+        name: prometheus
+      rules:
+      - apiGroups: [""]
+        resources:
+        - nodes
+        - nodes/proxy
+        - services
+        - services/proxy
+        - endpoints
+        - pods
+        - pods/proxy
+        verbs: ["get", "list", "watch"]
+      - apiGroups:
+        - extensions
+        resources:
+        - ingresses
+        verbs: ["get", "list", "watch"]
+      - nonResourceURLs: ["/metrics"]
+        verbs: ["get"]
+
+- name: Create prometheus ClusterRoleBinding
+  kubernetes.core.k8s:
+    kubeconfig: ~/.kube/config
+    state: present
+    definition:
+      apiVersion: rbac.authorization.k8s.io/v1
+      kind: ClusterRoleBinding
+      metadata:
+        name: prometheus
+      roleRef:
+        apiGroup: rbac.authorization.k8s.io
+        kind: ClusterRole
+        name: prometheus
+      subjects:
+      - kind: ServiceAccount
+        name: prometheus
+        namespace: monitoring
+
+- name: Get etcd CA certificate
+  slurp:
+    src: "{{ k8s_pki_path }}/etcd/ca.crt"
+  run_once: True
+  delegate_to: "{{ groups['master'][0] }}"
+  register: prom_etcd_ca
+
+- name: Get apiserver-etcd-client key
+  slurp:
+    src: "{{ k8s_pki_path }}/etcd/apiserver-etcd-client.key"
+  run_once: True
+  delegate_to: "{{ groups['master'][0] }}"
+  register: prom_etcd_key
+
+- name: Get apiserver-etcd-client cert
+  slurp:
+    src: "{{ k8s_pki_path }}/etcd/apiserver-etcd-client.crt"
+  run_once: True
+  delegate_to: "{{ groups['master'][0] }}"
+  register: prom_etcd_cert
+
+- name: Create prometheus secret
+  kubernetes.core.k8s:
+    kubeconfig: ~/.kube/config
+    state: present
+    definition:
+      apiVersion: v1
+      data:
+        ca.crt: "{{ prom_etcd_ca.content }}"
+        apiserver-etcd-client.crt: "{{ prom_etcd_cert.content }}"
+        apiserver-etcd-client.key: "{{ prom_etcd_key.content }}"
+      kind: Secret
+      metadata:
+        labels:
+          app.kubernetes.io/name: prometheus
+        name: prometheus-server-secrets
+        namespace: monitoring
+      type: Opaque
+
+- name: Create prometheus configmap
+  kubernetes.core.k8s:
+    kubeconfig: ~/.kube/config
+    state: present
+    template: "plugins/prometheus.yml.j2"
+    validate:
+      fail_on_error: yes
+
+- name: Create prometheus deployment
+  kubernetes.core.k8s:
+    kubeconfig: ~/.kube/config
+    state: present
+    definition:
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: prometheus
+        namespace: monitoring
+        labels:
+          app.kubernetes.io/name: prometheus
+      spec:
+        replicas: 1
+        selector:
+          matchLabels:
+            app.kubernetes.io/name: prometheus
+        template:
+          metadata:
+            labels:
+              app.kubernetes.io/name: prometheus
+          spec:
+            serviceAccountName: prometheus
+            securityContext:
+              fsGroup: 2000
+              runAsNonRoot: true
+              runAsUser: 1000
+            containers:
+            - name: prometheus
+              image: quay.io/prometheus/prometheus
+              imagePullPolicy: Always
+              args:
+                - "--config.file=/etc/prometheus/prometheus.yml"
+                - "--storage.tsdb.path={{ prometheus_storage_path }}"
+                - "--storage.tsdb.retention.time={{ prometheus_storage_retention }}"
+                - "--storage.tsdb.retention.size=0"
+                - "--web.enable-lifecycle"
+              ports:
+              - containerPort: 9090
+              readinessProbe:
+                httpGet:
+                  path: /-/ready
+                  port: 9090
+                initialDelaySeconds: 30
+                timeoutSeconds: 30
+              livenessProbe:
+                httpGet:
+                  path: /-/healthy
+                  port: 9090
+                initialDelaySeconds: 30
+                timeoutSeconds: 30
+              resources:
+                requests:
+                  cpu: 200m
+                  memory: 1024Mi
+              volumeMounts:
+              - mountPath: /tmp
+                name: tmp-volume        
+              - name: prometheus-certs
+                mountPath: /etc/prometheus/certs
+                readOnly: true
+              - name: prometheus-config
+                mountPath: /etc/prometheus/prometheus.yml
+                subPath: prometheus.yml
+              - name: nodes-config
+                mountPath: /etc/prometheus/nodes.yml
+                subPath: nodes.yml
+              - name: rules-config
+                mountPath: /etc/prometheus/prometheus.rules
+                subPath: prometheus.rules
+            volumes:
+            - name: tmp-volume
+              emptyDir: {}      
+            - name: prometheus-certs
+              secret:
+                secretName: prometheus-server-secrets
+                items:
+                - key: ca.crt
+                  path: ca.crt
+                - key: apiserver-etcd-client.crt
+                  path: apiserver-etcd-client.crt
+                - key: apiserver-etcd-client.key
+                  path: apiserver-etcd-client.key
+            - name: prometheus-config
+              configMap:
+                name: prometheus-server-conf
+                items:
+                - key: prometheus.yml
+                  path: prometheus.yml
+            - name: nodes-config
+              configMap:
+                name: prometheus-server-conf
+                items:
+                - key: nodes.yml
+                  path: nodes.yml
+            - name: rules-config
+              configMap:
+                name: prometheus-server-conf
+                items:
+                - key: prometheus.rules
+                  path: prometheus.rules
+
+- name: Create prometheus service
+  kubernetes.core.k8s:
+    kubeconfig: ~/.kube/config
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Service
+      metadata:
+        name: prometheus
+        namespace: monitoring
+        labels:
+          app.kubernetes.io/name: prometheus
+        annotations:
+          prometheus.io/scrape: "true"
+          prometheus.io/port: "9090"
+      spec:
+        selector:
+          app.kubernetes.io/name: prometheus
+        ports:
+        - port: 9090
+          targetPort: 9090
+          protocol: TCP

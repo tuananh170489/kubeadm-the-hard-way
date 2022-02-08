@@ -1,0 +1,55 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: null
+  labels:
+    component: kube-scheduler
+    tier: control-plane
+  name: kube-scheduler
+  namespace: kube-system
+spec:
+  containers:
+  - command:
+    - kube-scheduler
+    - --authentication-kubeconfig={{ k8s_kubeconfig_path }}/kube-scheduler.conf
+    - --authorization-kubeconfig={{ k8s_kubeconfig_path }}/kube-scheduler.conf
+    - --bind-address=127.0.0.1
+    - --config={{ k8s_kubeconfig_path }}/kube-scheduler.yaml
+    - --v=2
+    image: k8s.gcr.io/kube-scheduler:v{{ k8s_version }}
+    imagePullPolicy: IfNotPresent
+    livenessProbe:
+      failureThreshold: 8
+      httpGet:
+        host: 127.0.0.1
+        path: /healthz
+        port: 10259
+        scheme: HTTPS
+      initialDelaySeconds: 10
+      periodSeconds: 10
+      timeoutSeconds: 15
+    name: kube-scheduler
+    resources:
+      requests:
+        cpu: 100m
+    startupProbe:
+      failureThreshold: 24
+      httpGet:
+        host: 127.0.0.1
+        path: /healthz
+        port: 10259
+        scheme: HTTPS
+      initialDelaySeconds: 10
+      periodSeconds: 10
+      timeoutSeconds: 15
+    volumeMounts:
+    - mountPath: {{ k8s_kubeconfig_path }}
+      name: kubeconfig
+      readOnly: true
+  hostNetwork: true
+  priorityClassName: system-node-critical
+  volumes:
+  - hostPath:
+      path: {{ k8s_kubeconfig_path }}
+      type: DirectoryOrCreate
+    name: kubeconfig

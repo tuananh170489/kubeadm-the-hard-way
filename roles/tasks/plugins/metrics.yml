@@ -1,0 +1,328 @@
+- name: Create metrics-server service account
+  kubernetes.core.k8s:
+    kubeconfig: ~/.kube/config
+    state: present
+    definition:
+      apiVersion: v1
+      kind: ServiceAccount
+      metadata:
+        labels:
+          k8s-app: metrics-server
+        name: metrics-server
+        namespace: kube-system
+  run_once: True
+  delegate_to: localhost
+
+- name: Create metrics-server ClusterRole
+  kubernetes.core.k8s:
+    kubeconfig: ~/.kube/config
+    state: present
+    definition:
+      apiVersion: rbac.authorization.k8s.io/v1
+      kind: ClusterRole
+      metadata:
+        labels:
+          k8s-app: metrics-server
+          rbac.authorization.k8s.io/aggregate-to-admin: "true"
+          rbac.authorization.k8s.io/aggregate-to-edit: "true"
+          rbac.authorization.k8s.io/aggregate-to-view: "true"
+        name: system:aggregated-metrics-reader
+      rules:
+      - apiGroups:
+        - metrics.k8s.io
+        resources:
+        - pods
+        - nodes
+        verbs:
+        - get
+        - list
+        - watch
+  run_once: True
+  delegate_to: localhost
+
+- name: Create metrics-server ClusterRole
+  kubernetes.core.k8s:
+    kubeconfig: ~/.kube/config
+    state: present
+    definition:
+      apiVersion: rbac.authorization.k8s.io/v1
+      kind: ClusterRole
+      metadata:
+        labels:
+          k8s-app: metrics-server
+        name: system:metrics-server
+      rules:
+      - apiGroups:
+        - ""
+        resources:
+        - pods
+        - nodes
+        - nodes/stats
+        - namespaces
+        - configmaps
+        verbs:
+        - get
+        - list
+        - watch
+  run_once: True
+  delegate_to: localhost
+
+- name: Create metrics-server RoleBinding
+  kubernetes.core.k8s:
+    kubeconfig: ~/.kube/config
+    state: present
+    definition:
+      apiVersion: rbac.authorization.k8s.io/v1
+      kind: RoleBinding
+      metadata:
+        labels:
+          k8s-app: metrics-server
+        name: metrics-server-auth-reader
+        namespace: kube-system
+      roleRef:
+        apiGroup: rbac.authorization.k8s.io
+        kind: Role
+        name: extension-apiserver-authentication-reader
+      subjects:
+      - kind: ServiceAccount
+        name: metrics-server
+        namespace: kube-system
+  run_once: True
+  delegate_to: localhost
+
+- name: Create metrics-server ClusterRoleBinding
+  kubernetes.core.k8s:
+    kubeconfig: ~/.kube/config
+    state: present
+    definition:
+      apiVersion: rbac.authorization.k8s.io/v1
+      kind: ClusterRoleBinding
+      metadata:
+        labels:
+          k8s-app: metrics-server
+        name: metrics-server:system:auth-delegator
+      roleRef:
+        apiGroup: rbac.authorization.k8s.io
+        kind: ClusterRole
+        name: system:auth-delegator
+      subjects:
+      - kind: ServiceAccount
+        name: metrics-server
+        namespace: kube-system
+  run_once: True
+  delegate_to: localhost
+
+- name: Create metrics-server ClusterRoleBinding
+  kubernetes.core.k8s:
+    kubeconfig: ~/.kube/config
+    state: present
+    definition:
+      apiVersion: rbac.authorization.k8s.io/v1
+      kind: ClusterRoleBinding
+      metadata:
+        labels:
+          k8s-app: metrics-server
+        name: system:metrics-server
+      roleRef:
+        apiGroup: rbac.authorization.k8s.io
+        kind: ClusterRole
+        name: system:metrics-server
+      subjects:
+      - kind: ServiceAccount
+        name: metrics-server
+        namespace: kube-system
+  run_once: True
+  delegate_to: localhost
+
+- name: Get apiserver key
+  slurp:
+    src: "{{ k8s_pki_path }}/apiserver.key"
+  run_once: True
+  delegate_to: "{{ groups['master'][0] }}"
+  register: apiserver_key
+
+- name: Get apiserver cert
+  slurp:
+    src: "{{ k8s_pki_path }}/apiserver.crt"
+  run_once: True
+  delegate_to: "{{ groups['master'][0] }}"
+  register: apiserver_cert
+
+- name: Get kubelet key
+  slurp:
+    src: "{{ k8s_pki_path }}/apiserver-kubelet-client.key"
+  run_once: True
+  delegate_to: "{{ groups['master'][0] }}"
+  register: kubelet_key
+
+- name: Get kubelet cert
+  slurp:
+    src: "{{ k8s_pki_path }}/apiserver-kubelet-client.crt"
+  run_once: True
+  delegate_to: "{{ groups['master'][0] }}"
+  register: kubelet_cert
+
+- name: Get CA cert
+  slurp:
+    src: "{{ k8s_pki_path }}/ca.crt"
+  run_once: True
+  delegate_to: "{{ groups['master'][0] }}"
+  register: ca_cert
+
+- name: Create metrics-server secret
+  kubernetes.core.k8s:
+    kubeconfig: ~/.kube/config
+    state: present
+    definition:
+      apiVersion: v1
+      data:
+        ca.crt: "{{ ca_cert.content }}"
+        kubelet.crt: "{{ kubelet_cert.content }}"
+        kubelet.key: "{{ kubelet_key.content }}"
+        apiserver.crt: "{{ apiserver_cert.content }}"
+        apiserver.key: "{{ apiserver_key.content }}"
+      kind: Secret
+      metadata:
+        labels:
+          k8s-app: metrics-server
+        name: metrics-server-certs
+        namespace: kube-system
+      type: Opaque
+  run_once: True
+  delegate_to: localhost
+
+- name: Create metrics-server apiservice
+  kubernetes.core.k8s:
+    kubeconfig: ~/.kube/config
+    state: present
+    definition:
+      apiVersion: apiregistration.k8s.io/v1
+      kind: APIService
+      metadata:
+        labels:
+          k8s-app: metrics-server
+        name: v1beta1.metrics.k8s.io
+      spec:
+        group: metrics.k8s.io
+        groupPriorityMinimum: 100
+        insecureSkipTLSVerify: true
+        service:
+          name: metrics-server
+          namespace: kube-system
+        version: v1beta1
+        versionPriority: 100
+  run_once: True
+  delegate_to: localhost
+
+- name: Create metrics-server deployment
+  kubernetes.core.k8s:
+    kubeconfig: ~/.kube/config
+    state: present
+    definition:
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        labels:
+          k8s-app: metrics-server
+        name: metrics-server
+        namespace: kube-system
+      spec:
+        selector:
+          matchLabels:
+            k8s-app: metrics-server
+        strategy:
+          rollingUpdate:
+            maxUnavailable: 0
+        template:
+          metadata:
+            labels:
+              k8s-app: metrics-server
+          spec:
+            containers:
+            - args:
+              - --secure-port=6443
+              - --kubelet-certificate-authority=/etc/metrics-server/certs/ca.crt
+              - --kubelet-client-certificate=/etc/metrics-server/certs/kubelet.crt
+              - --kubelet-client-key=/etc/metrics-server/certs/kubelet.key
+              - --kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname
+              - --kubelet-use-node-status-port
+              - --tls-cert-file=/etc/metrics-server/certs/apiserver.crt
+              - --tls-private-key-file=/etc/metrics-server/certs/apiserver.key
+              - --metric-resolution=15s
+              - --contention-profiling=false
+              - --profiling=false
+              - --logtostderr
+              - --v=2
+              image: k8s.gcr.io/metrics-server/metrics-server:v0.5.1
+              imagePullPolicy: IfNotPresent
+              livenessProbe:
+                failureThreshold: 3
+                httpGet:
+                  path: /livez
+                  port: https
+                  scheme: HTTPS
+                periodSeconds: 10
+              name: metrics-server
+              ports:
+              - containerPort: 6443
+                name: https
+                protocol: TCP
+              readinessProbe:
+                failureThreshold: 3
+                httpGet:
+                  path: /readyz
+                  port: https
+                  scheme: HTTPS
+                periodSeconds: 10
+              securityContext:
+                readOnlyRootFilesystem: true
+                runAsNonRoot: true
+                runAsUser: 1000
+              volumeMounts:
+              - mountPath: /tmp
+                name: tmp-dir
+              - name: metrics-certs
+                mountPath: /etc/metrics-server/certs
+                readOnly: true
+            hostNetwork: true
+            nodeSelector:
+              kubernetes.io/os: linux
+              node-role.kubernetes.io/master: master
+            priorityClassName: system-cluster-critical
+            tolerations:
+              - key: node-role.kubernetes.io/master
+                effect: "NoSchedule"
+              - key: "CriticalAddonsOnly"
+                operator: "Exists"
+            serviceAccountName: metrics-server
+            volumes:
+            - emptyDir: {}
+              name: tmp-dir
+            - name: metrics-certs
+              secret:
+                secretName: metrics-server-certs
+  run_once: True
+  delegate_to: localhost
+
+- name: Create metrics-server service
+  kubernetes.core.k8s:
+    kubeconfig: ~/.kube/config
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Service
+      metadata:
+        labels:
+          k8s-app: metrics-server
+        name: metrics-server
+        namespace: kube-system
+      spec:
+        ports:
+        - name: https
+          port: 443
+          protocol: TCP
+          targetPort: https
+        selector:
+          k8s-app: metrics-server
+  run_once: True
+  delegate_to: localhost

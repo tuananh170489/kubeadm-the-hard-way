@@ -1,0 +1,114 @@
+- block:
+  - name: Enable modules for containerd
+    modprobe:
+      name: "{{ item }}"
+      state: present
+    loop:
+      - overlay
+      - br_netfilter
+  - name: Persist modules
+    copy:
+      content: |
+        overlay
+        br_netfilter
+      dest: "/etc/modules-load.d/containerd.conf"
+
+- block:
+  - name: Enable modules for IPVS
+    modprobe:
+      name: "{{ item }}"
+      state: present
+    loop:
+      - ip_vs
+      - ip_vs_rr
+      - ip_vs_wrr
+      - ip_vs_sh
+  - name: Persist modules
+    copy:
+      content: |
+        ip_vs
+        ip_vs_rr
+        ip_vs_wrr
+        ip_vs_sh
+      dest: "/etc/modules-load.d/ipvs.conf"
+
+- name: Config sysctl for containerd
+  copy:
+    content: |
+      net.ipv4.ip_forward = 1
+      net.bridge.bridge-nf-call-iptables = 1
+      net.bridge.bridge-nf-call-ip6tables = 1
+    dest: /etc/sysctl.d/99-kubernetes-cri.conf
+  notify:
+    - Reload sysctl
+
+- name: Force all handlers to run at this point
+  meta: flush_handlers
+
+- name: Download and install kubelet
+  get_url:
+    url: "https://storage.googleapis.com/kubernetes-release/release/v{{ k8s_version }}/bin/linux/amd64/kubelet"
+    dest: /usr/local/bin/
+    mode: 0755
+  timeout: 300
+  async: 300
+  poll: 5
+  register: kubelet_installation
+  until: kubelet_installation | success
+  retries: 3
+  delay: 3
+
+- name: Install CRI and CNI plugins
+  apt:
+    name:
+      - socat
+      - conntrack
+      - ipset
+      - ipvsadm
+      - kubernetes-cni
+      - containerd.io
+      - cri-tools
+    state: present
+    update_cache: Yes
+    install_recommends: No
+    force_apt_get: Yes
+  register: cri_cni_installation
+  until: cri_cni_installation | success
+  retries: 3
+  delay: 3
+
+- name: Create crictl config file
+  copy:
+    content: "runtime-endpoint: unix:///run/containerd/containerd.sock"
+    dest: /etc/crictl.yaml
+
+- name: Update the containerd configuration file
+  copy:
+    content: |
+      version = 2
+      [plugins]
+        [plugins."io.containerd.grpc.v1.cri"]
+          [plugins."io.containerd.grpc.v1.cri".containerd]
+            [plugins."io.containerd.grpc.v1.cri".containerd.runtimes]
+              [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc]
+                runtime_type = "io.containerd.runc.v2"
+                [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options]
+                  SystemdCgroup = true
+    dest: /etc/containerd/config.toml
+
+- name: Create the kubelet-config.yaml configuration file
+  template:
+    src: kubelet-config.yaml.j2
+    dest: "/var/lib/kubelet/config.yaml"
+
+- name: Create kubelet service file
+  template:
+    src: "kubelet.service.j2"
+    dest: "/etc/systemd/system/kubelet.service"
+
+- name: Be sure kubelet service is running and enabled
+  systemd:
+    name: kubelet
+    state: started
+    enabled: Yes
+    daemon_reload: Yes

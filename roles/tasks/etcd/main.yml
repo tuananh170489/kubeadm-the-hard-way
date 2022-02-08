@@ -1,0 +1,76 @@
+- name: Update etcd node into hosts file
+  lineinfile:
+    path: /etc/hosts
+    insertafter: EOF
+    line: "{{ item.0 }} {{ item.1 }}"
+  loop: "{{ etcd_nodes_ip | zip(groups['etcd']) | list }}"
+
+- name: Create etcd neccessary directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    recurse: Yes
+  loop:
+    - "{{ etcd_data_dir }}"
+    - "{{ etcd_conf_dir }}"
+  register: etcd_dir
+
+- name: Install etcd version {{ etcd_version }}
+  unarchive:
+    src: https://storage.googleapis.com/etcd/v{{ etcd_version }}/etcd-v{{ etcd_version }}-linux-amd64.tar.gz
+    remote_src: yes
+    dest: /usr/local/bin/
+    extra_opts:
+      - --strip-components=1
+      - etcd-v{{ etcd_version }}-linux-amd64/etcd
+      - etcd-v{{ etcd_version }}-linux-amd64/etcdctl
+    mode: 0755
+    owner: root
+    group: root
+  register: etcd_installation
+  until: etcd_installation | success
+  retries: 3
+  delay: 3
+
+- block:
+  - name: Initial etcd discovery url
+    uri:
+      url: https://discovery.etcd.io/new?size={{ etcd_nodes_length }}
+      return_content: Yes
+      method: GET
+      validate_certs: false
+    no_log: True
+    run_once: True
+    register: etcd_discovery
+  - name: Fetch etcd discovery url
+    set_fact:
+      etcd_discovery_url: "{{ etcd_discovery.content }}"
+      cacheable: Yes
+    run_once: True
+    when: etcd_discovery is succeeded
+
+- name: Create etcd config file
+  template:
+    src: etcd.conf.j2
+    dest: "{{ etcd_conf_dir }}/etcd.conf"
+  register: etcd_config
+
+- name: Create etcd service
+  template:
+    src: etcd.service.j2
+    dest: /etc/systemd/system/etcd.service
+
+- name: Be sure etcd is running and enabled
+  systemd:
+    name: etcd
+    state: started
+    enabled: Yes
+    daemon_reload: Yes
+  register: etcd_service
+  when: etcd_config is succeeded
+
+- name: Disk tuning for etcd
+  shell: ionice -c2 -n0 -p $(pgrep etcd)
+  args:
+    executable: /bin/bash
+  when: etcd_service is succeeded

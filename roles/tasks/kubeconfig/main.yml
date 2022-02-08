@@ -1,0 +1,13 @@
+- name: Generate kubeconfig for control plane components
+  include: kubeconfig_master.yml
+  when: inventory_hostname in groups['master']
+
+- name: Generate kubeconfig for worker components
+  include: kubeconfig_master.yml
+  when: (inventory_hostname in groups['master']) or (inventory_hostname in groups['worker'])
+
+- name: Generate kubeconfig for admin user
+  include: kubeconfig_admin.yml
+  run_once: True
+  delegate_to: localhost
+  become: False

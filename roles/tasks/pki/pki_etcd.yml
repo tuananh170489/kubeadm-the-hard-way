@@ -1,0 +1,124 @@
+- name: Create etcd pki directory
+  file:
+    path: "{{ etcd_pki_path }}"
+    state: directory
+    recurse: Yes
+
+- name: Store etcd CA certificate
+  copy:
+    dest: "{{ etcd_pki_path }}/ca.crt"
+    content: "{{ etcd_ca_cert.certificate }}"
+
+- name: Generate etcd server private key
+  community.crypto.openssl_privatekey:
+    path: "{{ etcd_pki_path }}/etcd.key"
+  no_log: True
+  register: etcd_key
+
+- name: Generate etcd server csr
+  community.crypto.openssl_csr_pipe:
+    privatekey_path: "{{ etcd_key.filename }}"
+    basic_constraints: "CA:FALSE"
+    basic_constraints_critical: True
+    key_usage:
+      - digitalSignature
+      - keyEncipherment
+    key_usage_critical: True
+    extended_key_usage:
+      - serverAuth
+    common_name: "kube-etcd"
+    country_name: "{{ k8s_ssl_country }}"
+    locality_name: "{{ k8s_ssl_location }}"
+    organization_name: "{{ k8s_ssl_organization }}"
+    organizational_unit_name: "{{ k8s_ssl_organization_unit }}"
+    subject_alt_name:
+      - DNS:{{ inventory_hostname }}
+      - IP:{{ ansible_default_ipv4['address'] }}
+      - IP:127.0.0.1
+  no_log: True
+  register: etcd_csr
+
+- name: Generate etcd server certificate
+  community.crypto.x509_certificate:
+    path: "{{ etcd_pki_path }}/etcd.crt"
+    csr_content: "{{ etcd_csr.csr }}"
+    ownca_content: "{{ etcd_ca_cert.certificate }}"
+    ownca_privatekey_content: "{{ etcd_ca_key.privatekey }}"
+    provider: ownca
+    ownca_not_after: +{{ k8s_ssl_expire_days }}
+  no_log: True
+
+- name: Generate etcd-peer private key
+  community.crypto.openssl_privatekey:
+    path: "{{ etcd_pki_path }}/etcd-peer.key"
+  no_log: True
+  register: etcd_peer_key
+
+- name: Generate etcd-peer csr
+  community.crypto.openssl_csr_pipe:
+    privatekey_path: "{{ etcd_peer_key.filename }}"
+    basic_constraints: "CA:FALSE"
+    basic_constraints_critical: True
+    key_usage:
+      - digitalSignature
+      - keyEncipherment
+    key_usage_critical: True
+    extended_key_usage:
+      - serverAuth
+      - clientAuth
+    common_name: "kube-etcd-peer"
+    country_name: "{{ k8s_ssl_country }}"
+    locality_name: "{{ k8s_ssl_location }}"
+    organization_name: "{{ k8s_ssl_organization }}"
+    organizational_unit_name: "{{ k8s_ssl_organization_unit }}"
+    subject_alt_name:
+      - DNS:{{ inventory_hostname }}
+      - IP:{{ ansible_default_ipv4['address'] }}
+      - IP:127.0.0.1
+  no_log: True
+  register: etcd_peer_csr
+
+- name: Generate etcd-peer certificate
+  community.crypto.x509_certificate:
+    path: "{{ etcd_pki_path }}/etcd-peer.crt"
+    csr_content: "{{ etcd_peer_csr.csr }}"
+    ownca_content: "{{ etcd_ca_cert.certificate }}"
+    ownca_privatekey_content: "{{ etcd_ca_key.privatekey }}"
+    provider: ownca
+    ownca_not_after: +{{ k8s_ssl_expire_days }}
+  no_log: True
+
+- name: Generate etcd-healthcheck-client private key
+  community.crypto.openssl_privatekey:
+    path: "{{ etcd_pki_path }}/etcd-healthcheck-client.key"
+  no_log: True
+  register: etcd_healthcheck_client_key
+
+- name: Generate etcd-healthcheck-client CSR
+  community.crypto.openssl_csr_pipe:
+    privatekey_path: "{{ etcd_healthcheck_client_key.filename }}"
+    basic_constraints: "CA:FALSE"
+    basic_constraints_critical: True
+    key_usage:
+      - digitalSignature
+      - keyEncipherment
+    key_usage_critical: True
+    extended_key_usage:
+      - clientAuth
+    common_name: 'kube-etcd-healthcheck-client'
+    country_name: "{{ k8s_ssl_country }}"
+    locality_name: "{{ k8s_ssl_location }}"
+    organization_name: "{{ k8s_ssl_organization }}"
+    organizational_unit_name: "{{ k8s_ssl_organization_unit }}"
+  no_log: True
+  register: etcd_healthcheck_client_csr
+
+- name: Generate etcd-healthcheck-client certificate
+  community.crypto.x509_certificate:
+    path: "{{ etcd_pki_path }}/etcd-healthcheck-client.crt"
+    csr_content: "{{ etcd_healthcheck_client_csr.csr }}"
+    ownca_content: "{{ etcd_ca_cert.certificate }}"
+    ownca_privatekey_content: "{{ etcd_ca_key.privatekey }}"
+    provider: ownca
+    ownca_not_after: +{{ k8s_ssl_expire_days }}
+  no_log: True

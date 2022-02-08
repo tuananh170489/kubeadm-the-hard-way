@@ -1,6 +1,0 @@
----
-- name: Update common settings
-  include: configure.yml
-
-- name: Install neccessary packages
-  include: install.yml

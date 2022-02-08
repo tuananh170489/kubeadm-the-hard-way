@@ -1,0 +1,33 @@
+- name: Generate admin private key
+  community.crypto.openssl_privatekey_pipe:
+  no_log: True
+  register: admin_key
+
+- name: Generate admin csr
+  community.crypto.openssl_csr_pipe:
+    privatekey_content: "{{ admin_key.privatekey }}"
+    basic_constraints: "CA:FALSE"
+    basic_constraints_critical: True
+    key_usage:
+      - digitalSignature
+      - keyEncipherment
+    key_usage_critical: True
+    extended_key_usage:
+      - clientAuth
+    common_name: "{{ k8s_cluster_name }}"
+    country_name: "{{ k8s_ssl_country }}"
+    locality_name: "{{ k8s_ssl_location }}"
+    organization_name: "system:masters"
+    organizational_unit_name: "{{ k8s_ssl_organization_unit }}"
+  no_log: True
+  register: admin_csr
+
+- name: Generate admin certificate
+  community.crypto.x509_certificate_pipe:
+    csr_content: "{{ admin_csr.csr }}"
+    ownca_content: "{{ k8s_ca_cert.certificate }}"
+    ownca_privatekey_content: "{{ k8s_ca_key.privatekey }}"
+    provider: ownca
+    ownca_not_after: +{{ k8s_ssl_expire_days }}
+  no_log: True
+  register: admin_cert

@@ -1,0 +1,162 @@
+# This is the configuration file for the etcd server.
+
+# Human-readable name for this member.
+name: {{ inventory_hostname }}
+
+# Path to the data directory.
+data-dir: {{ etcd_data_dir }}
+
+# Path to the dedicated wal directory.
+wal-dir: {{ etcd_data_dir }}/wal
+
+# Number of committed transactions to trigger a snapshot to disk.
+snapshot-count: 5000
+
+# Time (in milliseconds) of a heartbeat interval.
+heartbeat-interval: 100
+
+# Time (in milliseconds) for an election to timeout.
+election-timeout: 5000
+
+# Raise alarms when backend size exceeds the given quota. 0 means use the
+# default quota.
+quota-backend-bytes: 0
+
+# List of comma separated URLs to listen on for peer traffic.
+listen-peer-urls: https://{{ ansible_default_ipv4['address'] }}:2380
+
+# List of comma separated URLs to listen on for client traffic.
+listen-client-urls: https://{{ ansible_default_ipv4['address'] }}:2379,https://127.0.0.1:2379
+
+# Maximum number of snapshot files to retain (0 is unlimited).
+max-snapshots: 5
+
+# Maximum number of wal files to retain (0 is unlimited).
+max-wals: 5
+
+# Comma-separated white list of origins for CORS (cross-origin resource sharing).
+cors:
+
+# List of this member's peer URLs to advertise to the rest of the cluster.
+# The URLs needed to be a comma-separated list.
+initial-advertise-peer-urls: https://{{ ansible_default_ipv4['address'] }}:2380
+
+# List of this member's client URLs to advertise to the public.
+# The URLs needed to be a comma-separated list.
+{% if etcd_nodes_length | int  > 1 %}
+advertise-client-urls: https://etcd{{ groups['etcd'].index(inventory_hostname) + 1 }}.{{ k8s_env }}.{{ k8s_ssl_domain }}:2379
+{% else %}
+advertise-client-urls: https://etcd.{{ k8s_env }}.{{ k8s_ssl_domain }}:2379
+{% endif %}
+
+# Discovery URL used to bootstrap the cluster.
+{% if etcd_nodes_length | int  > 1 %}
+discovery: {{ etcd_discovery_url }}
+{% else %}
+discovery:
+{% endif %}
+
+# Valid values include 'exit', 'proxy'
+discovery-fallback: 'exit'
+
+# HTTP proxy to use for traffic to discovery service.
+discovery-proxy:
+
+# DNS domain used to bootstrap initial cluster.
+discovery-srv:
+
+# Initial cluster configuration for bootstrapping.
+initial-cluster:
+
+# Initial cluster token for the etcd cluster during bootstrap.
+initial-cluster-token: 'etcd-cluster'
+
+# Initial cluster state ('new' or 'existing').
+initial-cluster-state: 'new'
+
+# Reject reconfiguration requests that would cause quorum loss.
+strict-reconfig-check: true
+
+# Accept etcd V2 client requests
+{% if etcd_api_v2 == "disabled" %}
+enable-v2: false
+{% else %}
+enable-v2: true
+{% endif %}
+
+# Enable runtime profiling data via HTTP server
+enable-pprof: false
+
+# Valid values include 'on', 'readonly', 'off'
+proxy: 'off'
+
+# Time (in milliseconds) an endpoint will be held in a failed state.
+proxy-failure-wait: 5000
+
+# Time (in milliseconds) of the endpoints refresh interval.
+proxy-refresh-interval: 30000
+
+# Time (in milliseconds) for a dial to timeout.
+proxy-dial-timeout: 1000
+
+# Time (in milliseconds) for a write to timeout.
+proxy-write-timeout: 5000
+
+# Time (in milliseconds) for a read to timeout.
+proxy-read-timeout: 0
+
+client-transport-security:
+  # Path to the client server TLS cert file.
+  cert-file: {{ etcd_pki_path }}/etcd.crt
+
+  # Path to the client server TLS key file.
+  key-file: {{ etcd_pki_path }}/etcd.key
+
+  # Enable client cert authentication.
+  client-cert-auth: true
+
+  # Path to the client server TLS trusted CA cert file.
+  trusted-ca-file: {{ etcd_pki_path }}/ca.crt
+
+  # Client TLS using generated certificates
+  auto-tls: false
+
+peer-transport-security:
+  # Path to the peer server TLS cert file.
+  cert-file: {{ etcd_pki_path }}/etcd-peer.crt
+
+  # Path to the peer server TLS key file.
+  key-file: {{ etcd_pki_path }}/etcd-peer.key
+
+  # Enable peer client cert authentication.
+  client-cert-auth: true
+
+  # Path to the peer server TLS trusted CA cert file.
+  trusted-ca-file: {{ etcd_pki_path }}/ca.crt
+
+  # Peer TLS using generated certificates.
+  auto-tls: false
+
+  # Allowed CommonName for inter peer authentication
+  cert-allowed-cn: 'kube-etcd-peer'
+
+# The validity period of the self-signed certificate, the unit is year.
+self-signed-cert-validity: 1
+
+# Enable debug-level logging for etcd.
+debug: false
+
+# Logging driver
+logger: zap
+
+# Specify 'stdout' or 'stderr' to skip journald logging even when running under systemd.
+log-outputs: [stderr]
+
+# Configures log level. Only supports debug, info, warn, error, panic, or fatal
+log-level: 'info'
+
+# Interpret ‘auto-compaction-retention’ one of: ‘periodic’, ‘revision’. ‘periodic’ for duration based retention, defaulting to hours if no time unit is provided (e.g. ‘5m’). ‘revision’ for revision number based retention.
+auto-compaction-mode: periodic
+
+# Auto compaction retention for mvcc key value store in hour. 0 means disable auto compaction.
+auto-compaction-retention: "24"

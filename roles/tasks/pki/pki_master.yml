@@ -1,0 +1,257 @@
+- name: Create kubernetes pki directory
+  file:
+    path: "{{ item }}"
+    state: directory
+    recurse: Yes
+  loop:
+    - "{{ k8s_pki_path }}"
+    - "{{ k8s_pki_path }}/etcd"
+
+- name: Store kubernetes CA privatekey
+  copy:
+    dest: "{{ k8s_pki_path }}/ca.key"
+    content: "{{ k8s_ca_key.privatekey }}"
+  register: k8s_ca_key_file
+
+- name: Store kubernetes CA certificate
+  copy:
+    dest: "{{ k8s_pki_path }}/ca.crt"
+    content: "{{ k8s_ca_cert.certificate }}"
+  register: k8s_ca_cert_file
+
+- name: Generate apiserver private key
+  community.crypto.openssl_privatekey:
+    path: "{{ k8s_pki_path }}/apiserver.key"
+  no_log: True
+  register: apiserver_key
+
+- name: Generate apiserver csr
+  community.crypto.openssl_csr_pipe:
+    privatekey_path: "{{ apiserver_key.filename }}"
+    basic_constraints: "CA:FALSE"
+    basic_constraints_critical: True
+    key_usage:
+      - digitalSignature
+      - keyEncipherment
+    key_usage_critical: True
+    extended_key_usage:
+      - serverAuth
+      - clientAuth
+    common_name: "kube-apiserver"
+    country_name: "{{ k8s_ssl_country }}"
+    locality_name: "{{ k8s_ssl_location }}"
+    organization_name: "{{ k8s_ssl_organization }}"
+    organizational_unit_name: "{{ k8s_ssl_organization_unit }}"
+    subject_alt_name:
+      - DNS:kubernetes
+      - DNS:kubernetes.default
+      - DNS:kubernetes.default.svc
+      - DNS:kubernetes.default.svc.cluster
+      - DNS:kubernetes.default.svc.cluster.local
+      - DNS:localhost
+      - IP:{{ ansible_default_ipv4['address'] }}
+      - IP:127.0.0.1
+      - IP:{{ k8s_service_cidr | ipaddr("1") | ipaddr("address") }}
+  no_log: True
+  register: apiserver_csr
+
+- name: Generate apiserver certificate
+  community.crypto.x509_certificate:
+    path: '{{ k8s_pki_path }}/apiserver.crt'
+    csr_content: "{{ apiserver_csr.csr }}"
+    ownca_content: "{{ k8s_ca_cert.certificate }}"
+    ownca_privatekey_content: "{{ k8s_ca_key.privatekey }}"
+    provider: ownca
+    ownca_not_after: +{{ k8s_ssl_expire_days }}
+  no_log: True
+
+- name: Generate apiserver-kubelet-client private key
+  community.crypto.openssl_privatekey:
+    path: "{{ k8s_pki_path }}/apiserver-kubelet-client.key"
+  no_log: True
+  register: apiserver_kubelet_client_key
+
+- name: Generate apiserver-kubelet-client csr
+  community.crypto.openssl_csr_pipe:
+    privatekey_path: "{{ apiserver_kubelet_client_key.filename }}"
+    basic_constraints: "CA:FALSE"
+    basic_constraints_critical: True
+    key_usage:
+      - digitalSignature
+      - keyEncipherment
+    key_usage_critical: True
+    extended_key_usage:
+      - clientAuth
+    common_name: "kube-apiserver-kubelet-client"
+    country_name: "{{ k8s_ssl_country }}"
+    locality_name: "{{ k8s_ssl_location }}"
+    organization_name: "system:masters"
+    organizational_unit_name: "{{ k8s_ssl_organization_unit }}"
+  no_log: True
+  register: apiserver_kubelet_client_csr
+
+- name: Generate apiserver-kubelet-client certificate
+  community.crypto.x509_certificate:
+    path: "{{ k8s_pki_path }}/apiserver-kubelet-client.crt"
+    csr_content: "{{ apiserver_kubelet_client_csr.csr }}"
+    ownca_content: "{{ k8s_ca_cert.certificate }}"
+    ownca_privatekey_content: "{{ k8s_ca_key.privatekey }}"
+    provider: ownca
+    ownca_not_after: +{{ k8s_ssl_expire_days }}
+  no_log: True
+
+- name: Generate kube-controller-manager private key
+  community.crypto.openssl_privatekey_pipe:
+  no_log: True
+  register: kube_controller_manager_key
+
+- name: Generate kube-controller-manager CSR
+  community.crypto.openssl_csr_pipe:
+    privatekey_content: "{{ kube_controller_manager_key.privatekey }}"
+    basic_constraints: "CA:FALSE"
+    basic_constraints_critical: True
+    key_usage:
+      - digitalSignature
+      - keyEncipherment
+    key_usage_critical: True
+    extended_key_usage:
+      - serverAuth
+      - clientAuth
+    common_name: "system:kube-controller-manager"
+    country_name: "{{ k8s_ssl_country }}"
+    locality_name: "{{ k8s_ssl_location }}"
+    organization_name: "system:kube-controller-manager"
+    organizational_unit_name: "{{ k8s_ssl_organization_unit }}"
+  no_log: True
+  register: kube_controller_manager_csr
+
+- name: Generate kube-controller-manager certificate
+  community.crypto.x509_certificate_pipe:
+    csr_content: "{{ kube_controller_manager_csr.csr }}"
+    ownca_content: "{{ k8s_ca_cert.certificate }}"
+    ownca_privatekey_content: "{{ k8s_ca_key.privatekey }}"
+    provider: ownca
+    ownca_not_after: +{{ k8s_ssl_expire_days }}
+  register: kube_controller_manager_cert
+
+- name: Generate kube-scheduler private key
+  community.crypto.openssl_privatekey_pipe:
+  no_log: True
+  register: kube_scheduler_key
+
+- name: Generate kube-scheduler CSR
+  community.crypto.openssl_csr_pipe:
+    privatekey_content: "{{ kube_scheduler_key.privatekey }}"
+    basic_constraints: "CA:FALSE"
+    basic_constraints_critical: True
+    key_usage:
+      - digitalSignature
+      - keyEncipherment
+    key_usage_critical: True
+    extended_key_usage:
+      - serverAuth
+      - clientAuth
+    common_name: "system:kube-scheduler"
+    country_name: "{{ k8s_ssl_country }}"
+    locality_name: "{{ k8s_ssl_location }}"
+    organization_name: "system:kube-scheduler"
+    organizational_unit_name: "{{ k8s_ssl_organization_unit }}"
+  no_log: True
+  register: kube_scheduler_csr
+
+- name: Generate kube-scheduler certificate
+  community.crypto.x509_certificate_pipe:
+    csr_content: "{{ kube_scheduler_csr.csr }}"
+    ownca_content: "{{ k8s_ca_cert.certificate }}"
+    ownca_privatekey_content: "{{ k8s_ca_key.privatekey }}"
+    provider: ownca
+    ownca_not_after: +{{ k8s_ssl_expire_days }}
+  no_log: True
+  register: kube_scheduler_cert
+
+
+- name: Generate serviceaccounts public key
+  community.crypto.openssl_publickey:
+    path: "{{ k8s_pki_path }}/sa.pub"
+    privatekey_content: "{{ sa_key.privatekey }}"
+  no_log: True
+
+- name: Store etcd CA certificate
+  copy:
+    dest: "{{ k8s_pki_path }}/etcd/ca.crt"
+    content: "{{ etcd_ca_cert.certificate }}"
+
+- name: Generate apiserver-etcd-client private key
+  community.crypto.openssl_privatekey:
+    path: "{{ k8s_pki_path }}/etcd/apiserver-etcd-client.key"
+  no_log: True
+  register: apiserver_etcd_client_key
+
+- name: Generate apiserver-etcd-client csr
+  community.crypto.openssl_csr_pipe:
+    privatekey_path: "{{ apiserver_etcd_client_key.filename }}"
+    basic_constraints: "CA:FALSE"
+    basic_constraints_critical: True
+    key_usage:
+      - digitalSignature
+      - keyEncipherment
+    key_usage_critical: True
+    extended_key_usage:
+      - clientAuth
+    common_name: "kube-apiserver-etcd-client"
+    country_name: "{{ k8s_ssl_country }}"
+    locality_name: "{{ k8s_ssl_location }}"
+    organization_name: "system:masters"
+    organizational_unit_name: "{{ k8s_ssl_organization_unit }}"
+  no_log: True
+  register: apiserver_etcd_client_csr
+
+- name: Generate apiserver-etcd-client certificate
+  community.crypto.x509_certificate:
+    path: "{{ k8s_pki_path }}/etcd/apiserver-etcd-client.crt"
+    csr_content: "{{ apiserver_etcd_client_csr.csr }}"
+    ownca_content: "{{ etcd_ca_cert.certificate }}"
+    ownca_privatekey_content: "{{ etcd_ca_key.privatekey }}"
+    provider: ownca
+    ownca_not_after: +{{ k8s_ssl_expire_days }}
+  no_log: True
+
+- name: Generate kubelet private key
+  community.crypto.openssl_privatekey_pipe:
+  no_log: True
+  register: kubelet_key
+
+- name: Generate kubelet CSR
+  community.crypto.openssl_csr_pipe:
+    privatekey_content: "{{ kubelet_key.privatekey }}"
+    basic_constraints: "CA:FALSE"
+    basic_constraints_critical: True
+    key_usage:
+      - digitalSignature
+      - keyEncipherment
+    key_usage_critical: True
+    extended_key_usage:
+      - serverAuth
+      - clientAuth
+    common_name: "system:node:{{ inventory_hostname }}"
+    country_name: "{{ k8s_ssl_country }}"
+    locality_name: "{{ k8s_ssl_location }}"
+    organization_name: "system:nodes"
+    organizational_unit_name: "{{ k8s_ssl_organization_unit }}"
+    subject_alt_name:
+      - DNS:{{ inventory_hostname }}
+      - DNS:localhost
+      - IP:{{ ansible_default_ipv4['address'] }}
+      - IP:127.0.0.1
+  no_log: True
+  register: kubelet_csr
+
+- name: Generate kubelet certificate
+  community.crypto.x509_certificate_pipe:
+    csr_content: "{{ kubelet_csr.csr }}"
+    ownca_content: "{{ k8s_ca_cert.certificate }}"
+    ownca_privatekey_content: "{{ k8s_ca_key.privatekey }}"
+    provider: ownca
+    ownca_not_after: +{{ k8s_ssl_expire_days }}
+  no_log: True
+  register: kubelet_cert

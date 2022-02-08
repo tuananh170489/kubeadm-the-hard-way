@@ -1,0 +1,44 @@
+- name: Generate PKI for kubernetes cluster
+  include: pki/main.yml
+
+- name: Generate kubeconfig for kubernetes cluster
+  include: kubeconfig/main.yml
+
+- name: Bootstrapping the etcd cluster
+  include: etcd/main.yml
+  when: inventory_hostname in groups['etcd']
+
+- name: Install kubelet for all nodes
+  include: kubelet/main.yml
+  when: (inventory_hostname in groups['master']) or (inventory_hostname in groups['worker'])
+
+- name: Spin up kube-apiserver
+  include: kube-apiserver/main.yml
+  when: inventory_hostname in groups['master']
+
+- name: Start kube-controller-manager
+  include: kube-controller-manager/main.yml
+  when: inventory_hostname in groups['master']
+
+- name: Start up kube-scheduler
+  include: kube-scheduler/main.yml
+  when: inventory_hostname in groups['master']
+
+- name: Add worker nodes
+  include: worker/main.yml
+  when: inventory_hostname in groups['worker']
+
+# - name: Post-setup the kubernetes cluster
+#   include: post_setup.yml
+#   run_once: True
+#   delegate_to: localhost
+#   become: False
+
+# - name: Install network plugins
+#   include: plugins/cni.yml
+#   run_once: True
+#   delegate_to: localhost
+
+# - name: Install kubernetes plugins
+#   include: plugins.yml
+#   tags: plugins

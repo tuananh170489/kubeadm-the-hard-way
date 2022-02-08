@@ -1,0 +1,53 @@
+- name: Configured RBAC rules to allow Node Bootstrap tokens to post CSRs in order for nodes to get long term certificate credentials
+  kubernetes.core.k8s:
+    kubeconfig: ~/.kube/config
+    state: present
+    definition:
+      apiVersion: rbac.authorization.k8s.io/v1
+      kind: ClusterRoleBinding
+      metadata:
+        name: system:kubelet-bootstrap
+      subjects:
+      - apiGroup: rbac.authorization.k8s.io
+        kind: Group
+        name: system:bootstrappers
+      roleRef:
+        apiGroup: rbac.authorization.k8s.io
+        kind: ClusterRole
+        name: system:node-bootstrapper
+
+- name: Configured RBAC rules to allow the csrapprover controller automatically approve CSRs from a Node Bootstrap Token
+  kubernetes.core.k8s:
+    kubeconfig: ~/.kube/config
+    state: present
+    definition:
+      apiVersion: rbac.authorization.k8s.io/v1
+      kind: ClusterRoleBinding
+      metadata:
+        name: system:node-autoapprove-bootstrap
+      subjects:
+      - apiGroup: rbac.authorization.k8s.io
+        kind: Group
+        name: system:bootstrappers
+      roleRef:
+        apiGroup: rbac.authorization.k8s.io
+        kind: ClusterRole
+        name: system:certificates.k8s.io:certificatesigningrequests:nodeclient
+
+- name: Configured RBAC rules to allow the csrapprover controller automatically approve CSRs from a Node Bootstrap Token
+  kubernetes.core.k8s:
+    kubeconfig: ~/.kube/config
+    state: present
+    definition:
+      apiVersion: rbac.authorization.k8s.io/v1
+      kind: ClusterRoleBinding
+      metadata:
+        name: system:node-autoapprove-certificate-rotation
+      subjects:
+      - apiGroup: rbac.authorization.k8s.io
+        kind: Group
+        name: system:nodes
+      roleRef:
+        apiGroup: rbac.authorization.k8s.io
+        kind: ClusterRole
+        name: system:certificates.k8s.io:certificatesigningrequests:selfnodeclient

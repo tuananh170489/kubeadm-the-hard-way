@@ -1,0 +1,92 @@
+- name: Generate etcd CA private key
+  community.crypto.openssl_privatekey_pipe:
+  no_log: True
+  register: etcd_ca_key
+
+- name: Generate etcd CA CSR
+  community.crypto.openssl_csr_pipe:
+    privatekey_content: "{{ etcd_ca_key.privatekey }}"
+    basic_constraints: "CA:TRUE"
+    basic_constraints_critical: True
+    key_usage:
+      - cRLSign
+      - keyCertSign
+    key_usage_critical: True
+    common_name: "etcd-ca"
+    country_name: "{{ k8s_ssl_country }}"
+    locality_name: "{{ k8s_ssl_location }}"
+    organization_name: "{{ k8s_ssl_organization }}"
+    organizational_unit_name: "{{ k8s_ssl_organization_unit }}"
+  no_log: True
+  register: etcd_ca_csr
+
+- name: Generate etcd CA certificate
+  community.crypto.x509_certificate_pipe:
+    privatekey_content: "{{ etcd_ca_key.privatekey }}"
+    csr_content: "{{ etcd_ca_csr.csr }}"
+    provider: selfsigned
+    selfsigned_not_after: +{{ k8s_ssl_expire_days }}
+  no_log: True
+  register: etcd_ca_cert
+
+- name: Generate kubernetes CA private key
+  community.crypto.openssl_privatekey_pipe:
+  no_log: True
+  register: k8s_ca_key
+
+- name: Generate kubernetes CA CSR
+  community.crypto.openssl_csr_pipe:
+    privatekey_content: "{{ k8s_ca_key.privatekey }}"
+    basic_constraints: "CA:TRUE"
+    basic_constraints_critical: True
+    key_usage:
+      - cRLSign
+      - keyCertSign
+    key_usage_critical: True
+    common_name: "kubernetes-ca"
+    country_name: "{{ k8s_ssl_country }}"
+    locality_name: "{{ k8s_ssl_location }}"
+    organization_name: "{{ k8s_ssl_organization }}"
+    organizational_unit_name: "{{ k8s_ssl_organization_unit }}"
+  no_log: True
+  register: k8s_ca_csr
+
+- name: Generate kubernetes CA certificate
+  community.crypto.x509_certificate_pipe:
+    privatekey_content: "{{ k8s_ca_key.privatekey }}"
+    csr_content: "{{ k8s_ca_csr.csr }}"
+    provider: selfsigned
+    selfsigned_not_after: +{{ k8s_ssl_expire_days }}
+  no_log: True
+  register: k8s_ca_cert
+
+- name: Generate front-proxy CA private key
+  community.crypto.openssl_privatekey_pipe:
+  no_log: True
+  register: k8s_front_proxy_ca_key
+
+- name: Generate front-proxy CA CSR
+  community.crypto.openssl_csr_pipe:
+    privatekey_content: "{{ k8s_front_proxy_ca_key.privatekey }}"
+    basic_constraints: "CA:TRUE"
+    basic_constraints_critical: True
+    key_usage:
+      - cRLSign
+      - keyCertSign
+    key_usage_critical: True
+    common_name: "kubernetes-front-proxy-ca"
+    country_name: "{{ k8s_ssl_country }}"
+    locality_name: "{{ k8s_ssl_location }}"
+    organization_name: "{{ k8s_ssl_organization }}"
+    organizational_unit_name: "{{ k8s_ssl_organization_unit }}"
+  no_log: True
+  register: k8s_front_proxy_ca_csr
+
+- name: Generate front-proxy CA certificate
+  community.crypto.x509_certificate_pipe:
+    privatekey_content: "{{ k8s_front_proxy_ca_key.privatekey }}"
+    csr_content: "{{ k8s_front_proxy_ca_csr.csr }}"
+    provider: selfsigned
+    selfsigned_not_after: +{{ k8s_ssl_expire_days }}
+  no_log: True
+  register: k8s_front_proxy_ca_cert

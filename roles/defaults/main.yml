@@ -1,0 +1,52 @@
+k8s_env: "{{ 'prod' | default('dev')}}"
+
+# PKI
+k8s_ssl_domain: 'k8s.oncx.fpt.work'
+k8s_ssl_country: VN
+k8s_ssl_location: HCM
+k8s_ssl_organization: FTI
+k8s_ssl_organization_unit: SDC
+k8s_ssl_expire_days: 24855d
+
+# Etcd vars
+etcd_version: 3.4.15
+etcd_conf_dir: "/etc/etcd"
+etcd_data_dir: "/var/lib/etcd"
+etcd_pki_path: "/etc/etcd/pki"
+etcd_nodes_length: "{{ groups['etcd'] | length }}"
+etcd_nodes_ip: "{{ groups['etcd'] | map('extract', hostvars, ['ansible_default_ipv4', 'address']) | list }}"
+etcd_api_v2: "{{ 'disabled' | default('enabled') }}" # Available value: "enabled" and "disabled"
+
+# K8s vars
+k8s_version: 1.21.9
+k8s_apis_lb: "{{ 'enabled' | default('disabled') }}" # Available value: "enabled" and "disabled"
+k8s_apis_lb_ip: 172.20.0.137
+k8s_apis_url: "apis.{{ k8s_env }}.{{ k8s_ssl_domain }}"
+k8s_cluster_name: "oncx-prod"
+k8s_service_cidr: 10.48.0.0/16
+k8s_pod_cidr: 10.96.0.0/16
+k8s_masters_length: "{{ groups['master'] | length }}"
+k8s_masters_ip : "{{ groups['master'] | map('extract', hostvars, ['ansible_default_ipv4', 'address']) | list }}"
+k8s_workers_ip: "{{ groups['worker'] | map('extract', hostvars, ['ansible_default_ipv4', 'address']) | list }}"
+k8s_pki_path: "/etc/kubernetes/pki"
+k8s_kubeconfig_path: "/etc/kubernetes/config"
+k8s_log_path: "/var/log/kubernetes"
+k8s_log_file_size: 100 # MB in unit
+k8s_apis_port: "{{ '443' | default('6443') }}"
+k8s_apis_event_ttl: "{{ '168h' | default('12h') }}"
+k8s_apis_enable_admission_plugins:
+  - "NamespaceLifecycle"
+  - "NodeRestriction"
+  - "LimitRanger"
+  - "ServiceAccount"
+  - "DefaultStorageClass"
+  - "ResourceQuota"
+k8s_terminated_pod_gc_threshold: "{{ 1000 | default(500) }}"
+k8s_proxy_mode: "ipvs" # Available value: "iptables" and "ipvs"
+k8s_cni_plugin: "kube-router" # Available value: "kube-router", "calico", "flannel" and "cilium"
+
+# Plugins
+coredns_version: 1.8.0
+nodelocaldns_version: 1.21.1
+prometheus_storage_path: "/tmp"
+prometheus_storage_retention: "{{ '14d' | default('7d') }}"

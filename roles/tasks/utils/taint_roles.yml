@@ -1,0 +1,38 @@
+- name: Fetch all nodes
+  set_fact:
+    nodes: "{{ lookup('k8s', kind='Node') }}"
+
+- name: Get control plane nodes
+  set_fact:
+    master_nodes: "{{ nodes | json_query('[*].metadata.name') | select('match', '.*master*.') }}"
+
+- name: Get worker nodes
+  set_fact:
+    worker_nodes: "{{ nodes | json_query('[*].metadata.name') | select('match', '.*worker*.') }}"
+
+- name: Taint and set role master nodes
+  kubernetes.core.k8s:
+    state: patched
+    kind: Node
+    name: "{{ master_nodes }}"
+    definition:
+      metadata:
+        labels:
+          node-role.kubernetes.io/control-plane: ""
+          node-role.kubernetes.io/master: ""
+      spec:
+        taints:
+        - effect: NoSchedule
+          key: node-role.kubernetes.io/master
+  loop: "{{ master_nodes }}"
+
+- name: Set role worker nodes
+  kubernetes.core.k8s:
+    state: patched
+    kind: Node
+    name: "{{ worker_nodes }}"
+    definition:
+      metadata:
+        labels:
+          node-role.kubernetes.io/worker: ""
+  loop: "{{ worker_nodes }}"

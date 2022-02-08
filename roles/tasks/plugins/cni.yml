@@ -1,0 +1,7 @@
+- name: Install kube-router network plugin
+  include: plugins/calico.yaml
+  when: k8s_cni_plugin == "kube-router"
+
+- name: Install calico network plugin
+  include: plugins/calico.yaml
+  when: k8s_cni_plugin == "calico"

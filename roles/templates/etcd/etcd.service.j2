@@ -1,0 +1,12 @@
+[Unit]
+Description=Etcd - A distributed, reliable key-value store for the most critical data of a distributed system
+Documentation=https://etcd.io/docs
+
+[Service]
+Type=notify
+ExecStart=/usr/local/bin/etcd --config-file {{ etcd_conf_dir }}/etcd.conf
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

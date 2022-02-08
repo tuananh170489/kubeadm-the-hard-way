@@ -1,0 +1,10 @@
+- name: Create kubernetes pki directory
+  file:
+    path: "{{ k8s_pki_path }}"
+    state: directory
+    recurse: Yes
+
+- name: Store kubernetes CA certificate
+  copy:
+    dest: "{{ k8s_pki_path }}/ca.crt"
+    content: "{{ k8s_ca_cert.certificate }}"

@@ -1,0 +1,4 @@
+- name: Create kube-controller-manager manifest file
+  template:
+    src: "kube-controller-manager.yaml.j2"
+    dest: "/etc/kubelet.d/kube-controller-manager.yaml"

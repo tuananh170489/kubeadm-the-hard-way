@@ -1,0 +1,43 @@
+apiVersion: kubelet.config.k8s.io/v1beta1
+kind: KubeletConfiguration
+authentication:
+  anonymous:
+    enabled: false
+  webhook:
+    enabled: true
+    cacheTTL: 0s
+  x509:
+    clientCAFile: "{{ k8s_pki_path }}/ca.crt"
+authorization:
+  mode: Webhook
+  webhook:
+    cacheAuthorizedTTL: "0s"
+    cacheUnauthorizedTTL: "0s"
+staticPodPath: "/etc/kubelet.d"
+cgroupDriver: systemd
+cpuManagerReconcilePeriod: "0s"
+evictionPressureTransitionPeriod: "0s"
+streamingConnectionIdleTimeout: "0s"
+allowedUnsafeSysctls:
+  - "kernel.shm*"
+  - "kernel.msg*"
+  - "kernel.sem"
+  - "fs.mqueue.*"
+  - "net.*"
+  - "net.core.somaxconn"
+failSwapOn: false
+fileCheckFrequency: "0s"
+nodeStatusUpdateFrequency: "0s"
+nodeStatusReportFrequency: "0s"
+maxOpenFiles: 2097152
+readOnlyPort: 0
+containerLogMaxSize: "100Mi"
+containerLogMaxFiles: 5
+clusterDomain: "cluster.local"
+clusterDNS:
+  - "{{ k8s_service_cidr | ipaddr('10') | ipaddr('address') }}"
+resolvConf: "/run/systemd/resolve/resolv.conf"
+rotateCertificates: true
+runtimeRequestTimeout: "0s"
+syncFrequency: "0s"
+volumeStatsAggPeriod: "0"

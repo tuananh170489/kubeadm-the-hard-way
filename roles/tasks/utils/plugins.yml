@@ -1,0 +1,33 @@
+# - name: Deploy CoreDNS
+#   include: plugins/coredns.yml
+#   run_once: True
+#   delegate_to: localhost
+#   register: coredns
+
+# - name: Wait for CoreDNS service running completely
+#   wait_for:
+#     timeout: 30
+#     delay: 10
+#   run_once: True
+#   delegate_to: localhost
+#   when: coredns is succeeded
+
+# - name: Deploy NodeLocalDNS
+#   include: plugins/nodelocaldns.yml
+#   run_once: True
+#   delegate_to: localhost
+
+# - name: Deploy metrics-server and kube-state-metrics
+#   include: plugins/metrics.yml
+#   run_once: True
+#   delegate_to: localhost
+
+# - name: Deploy keda HPA
+#   include: plugins/keda.yml
+#   run_once: True
+#   delegate_to: localhost
+
+- name: Deploy prometheus
+  include: plugins/prometheus.yml
+  run_once: True
+  delegate_to: localhost

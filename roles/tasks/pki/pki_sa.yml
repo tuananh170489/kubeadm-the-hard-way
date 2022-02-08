@@ -1,0 +1,5 @@
+- name: Generate serviceaccounts private key
+  community.crypto.openssl_privatekey_pipe:
+    size: 2048
+  no_log: True
+  register: sa_key
